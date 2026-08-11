@@ -55,7 +55,7 @@ def on_login(username_or_email: str, password: str):
     success, msg, user_dict = db_authenticate_user(username_or_email, password)
     if success and user_dict:
         choices = get_history_choices(user_dict)
-        dropdown_update = gr.Dropdown(choices=choices, value=None, interactive=True)
+        dropdown_update = gr.Dropdown(choices=choices, value=None, interactive=True, allow_custom_value=True)
         status_html = f"<div style='color:#34d399;font-weight:600;font-size:13px;padding:8px;background:rgba(52,211,153,0.1);border-radius:8px;margin-top:8px;'>✅ {msg}</div>"
         user_badge = f"<span style='color:#e3e3e3;font-weight:600;'>{user_dict['username']}</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>"
         return (
@@ -73,7 +73,7 @@ def on_login(username_or_email: str, password: str):
             status_html,                                        # auth_status
             gr.Column(visible=True),                            # auth_view (keep visible)
             gr.Column(visible=False),                           # main_view (keep hidden)
-            gr.Dropdown(choices=[], value=None),                # history_dropdown
+            gr.Dropdown(choices=[], value=None, allow_custom_value=True), # history_dropdown
             "<span style='color:#e3e3e3;font-weight:600;'>Guest User</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>",
         )
 
@@ -83,7 +83,7 @@ def on_signup(username: str, email: str, password: str):
     success, msg, user_dict = db_create_user(username, email, password)
     if success and user_dict:
         choices = get_history_choices(user_dict)
-        dropdown_update = gr.Dropdown(choices=choices, value=None, interactive=True)
+        dropdown_update = gr.Dropdown(choices=choices, value=None, interactive=True, allow_custom_value=True)
         status_html = f"<div style='color:#34d399;font-weight:600;font-size:13px;padding:8px;background:rgba(52,211,153,0.1);border-radius:8px;margin-top:8px;'>✅ {msg}</div>"
         user_badge = f"<span style='color:#e3e3e3;font-weight:600;'>{user_dict['username']}</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>"
         return (
@@ -101,7 +101,7 @@ def on_signup(username: str, email: str, password: str):
             status_html,
             gr.Column(visible=True),
             gr.Column(visible=False),
-            gr.Dropdown(choices=[], value=None),
+            gr.Dropdown(choices=[], value=None, allow_custom_value=True),
             "<span style='color:#e3e3e3;font-weight:600;'>Guest User</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>",
         )
 
@@ -113,7 +113,7 @@ def on_guest():
         "",                                                     # auth_status
         gr.Column(visible=False),                               # auth_view (hide)
         gr.Column(visible=True),                                # main_view (show)
-        gr.Dropdown(choices=[], value=None, interactive=False), # history_dropdown
+        gr.Dropdown(choices=[], value=None, interactive=False, allow_custom_value=True), # history_dropdown
         "<span style='color:#e3e3e3;font-weight:600;'>Guest User</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>",
     )
 
@@ -127,7 +127,7 @@ def on_logout():
         "<div style='color:#94a3b8;font-size:13px;padding:8px;'>Signed out successfully.</div>", # auth_status
         gr.Column(visible=True),                                # auth_view (show)
         gr.Column(visible=False),                               # main_view (hide)
-        gr.Dropdown(choices=[], value=None, interactive=False), # history_dropdown
+        gr.Dropdown(choices=[], value=None, interactive=False, allow_custom_value=True), # history_dropdown
         "<span style='color:#e3e3e3;font-weight:600;'>Guest User</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>",
         "", "", "", "", ""                                      # clear inputs
     )
@@ -155,13 +155,13 @@ def on_select_history(session_id: str, user_state: Optional[dict]) -> Tuple[str,
 def on_delete_history(session_id: str, user_state: Optional[dict]) -> Tuple[None, list, gr.Dropdown, str]:
     """Deletes selected conversation from database and updates history UI."""
     if not session_id or not user_state or "id" not in user_state:
-        return None, [], gr.Dropdown(choices=[]), "<div style='color:#f87171;font-size:12px;margin-top:4px;'>No chat selected to delete.</div>"
+        return None, [], gr.Dropdown(choices=[], allow_custom_value=True), "<div style='color:#f87171;font-size:12px;margin-top:4px;'>No chat selected to delete.</div>"
     try:
         db_delete_conversation(session_id, user_state["id"])
         choices = get_history_choices(user_state)
-        return None, [], gr.Dropdown(choices=choices, value=None), "<div style='color:#34d399;font-size:12px;margin-top:4px;'>🗑️ Deleted conversation.</div>"
+        return None, [], gr.Dropdown(choices=choices, value=None, allow_custom_value=True), "<div style='color:#34d399;font-size:12px;margin-top:4px;'>🗑️ Deleted conversation.</div>"
     except Exception as e:
-        return session_id, [], gr.Dropdown(choices=[]), f"<div style='color:#f87171;font-size:12px;margin-top:4px;'>Error deleting: {e}</div>"
+        return session_id, [], gr.Dropdown(choices=[], allow_custom_value=True), f"<div style='color:#f87171;font-size:12px;margin-top:4px;'>Error deleting: {e}</div>"
 
 
 # ─────────────────────────────────────────────
@@ -180,14 +180,14 @@ async def chat(
     """
     if not user_message.strip():
         choices = get_history_choices(user_state)
-        return history, "", active_session_id, gr.Dropdown(choices=choices)
+        return history, "", active_session_id, gr.Dropdown(choices=choices, allow_custom_value=True)
 
     if not os.getenv("GEMINI_API_KEY"):
         bot_msg = "**API Key Missing!**\n\nPlease add your `GEMINI_API_KEY` to the `.env` file:\n```\nGEMINI_API_KEY=your_key_here\n```\nGet your key at: https://aistudio.google.com/app/apikey"
         history.append({"role": "user", "content": user_message})
         history.append({"role": "assistant", "content": bot_msg})
         choices = get_history_choices(user_state)
-        return history, "", active_session_id, gr.Dropdown(choices=choices)
+        return history, "", active_session_id, gr.Dropdown(choices=choices, allow_custom_value=True)
 
     try:
         session_id = active_session_id
@@ -219,14 +219,15 @@ async def chat(
         history.append({"role": "assistant", "content": formatted})
 
         choices = get_history_choices(user_state)
-        return history, "", session_id, gr.Dropdown(choices=choices, value=session_id)
+        selected_val = session_id if any(c[1] == session_id for c in choices) else None
+        return history, "", session_id, gr.Dropdown(choices=choices, value=selected_val, allow_custom_value=True)
 
     except Exception as e:
         error_msg = f"**Error:** {str(e)}\n\nPlease check your API key and try again."
         history.append({"role": "user", "content": user_message})
         history.append({"role": "assistant", "content": error_msg})
         choices = get_history_choices(user_state)
-        return history, "", active_session_id, gr.Dropdown(choices=choices)
+        return history, "", active_session_id, gr.Dropdown(choices=choices, allow_custom_value=True)
 
 
 # ─────────────────────────────────────────────
@@ -908,6 +909,7 @@ def build_ui():
                             choices=[],
                             value=None,
                             interactive=True,
+                            allow_custom_value=True,
                             elem_classes="history-select",
                             container=False,
                         )
