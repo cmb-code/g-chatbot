@@ -1,4 +1,4 @@
-pydantic-ai-slim>=0.0.21
+pydantic-ai-slim>=2.24.0,<3
 google-genai>=1.47.0
 gradio
 pydantic>=2.9.0

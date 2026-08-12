@@ -10,14 +10,14 @@ Layout Specifications Replicated from Architecture:
 """
 
 import os
+import time
 import uuid
+from collections.abc import AsyncIterator
 from typing import Optional, Tuple
 
 import gradio as gr
 
-from agents.car_agent import chat_with_autobot
-from tools.car_tools import calculate_emi, get_all_cars
-from ui.formatters import FORMATTERS, format_general
+from agents.automotive_agent import stream_chat_with_autobot
 from db.auth import db_create_user, db_authenticate_user
 from db.queries import (
     db_create_conversation,
@@ -57,7 +57,7 @@ def on_login(username_or_email: str, password: str):
         choices = get_history_choices(user_dict)
         dropdown_update = gr.Dropdown(choices=choices, value=None, interactive=True, allow_custom_value=True)
         status_html = f"<div style='color:#34d399;font-weight:600;font-size:13px;padding:8px;background:rgba(52,211,153,0.1);border-radius:8px;margin-top:8px;'>✅ {msg}</div>"
-        user_badge = f"<span style='color:#e3e3e3;font-weight:600;'>{user_dict['username']}</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>"
+        user_badge = f"<span style='color:#24262d;font-weight:600;'>{user_dict['username']}</span><br/><span style='color:#7b818c;font-size:11px;'>Free plan</span>"
         return (
             user_dict,                                          # user_state
             status_html,                                        # auth_status
@@ -74,7 +74,7 @@ def on_login(username_or_email: str, password: str):
             gr.Column(visible=True),                            # auth_view (keep visible)
             gr.Column(visible=False),                           # main_view (keep hidden)
             gr.Dropdown(choices=[], value=None, allow_custom_value=True), # history_dropdown
-            "<span style='color:#e3e3e3;font-weight:600;'>Guest User</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>",
+            "<span style='color:#24262d;font-weight:600;'>Guest User</span><br/><span style='color:#7b818c;font-size:11px;'>Free plan</span>",
         )
 
 
@@ -114,7 +114,7 @@ def on_guest():
         gr.Column(visible=False),                               # auth_view (hide)
         gr.Column(visible=True),                                # main_view (show)
         gr.Dropdown(choices=[], value=None, interactive=False, allow_custom_value=True), # history_dropdown
-        "<span style='color:#e3e3e3;font-weight:600;'>Guest User</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>",
+        "<span style='color:#24262d;font-weight:600;'>Guest User</span><br/><span style='color:#7b818c;font-size:11px;'>Free plan</span>",
     )
 
 
@@ -128,8 +128,28 @@ def on_logout():
         gr.Column(visible=True),                                # auth_view (show)
         gr.Column(visible=False),                               # main_view (hide)
         gr.Dropdown(choices=[], value=None, interactive=False, allow_custom_value=True), # history_dropdown
-        "<span style='color:#e3e3e3;font-weight:600;'>Guest User</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>",
+        "<span style='color:#24262d;font-weight:600;'>Guest User</span><br/><span style='color:#7b818c;font-size:11px;'>Free plan</span>",
         "", "", "", "", ""                                      # clear inputs
+    )
+
+
+def show_login_form():
+    """Switch the authentication form without relying on Gradio Tabs internals."""
+    return (
+        gr.Column(visible=True),
+        gr.Column(visible=False),
+        gr.Button(elem_classes=["auth-tab", "is-active"]),
+        gr.Button(elem_classes=["auth-tab"]),
+    )
+
+
+def show_signup_form():
+    """Switch the authentication form without relying on Gradio Tabs internals."""
+    return (
+        gr.Column(visible=False),
+        gr.Column(visible=True),
+        gr.Button(elem_classes=["auth-tab"]),
+        gr.Button(elem_classes=["auth-tab", "is-active"]),
     )
 
 
@@ -173,21 +193,22 @@ async def chat(
     history: list,
     user_state: Optional[dict],
     active_session_id: Optional[str]
-) -> Tuple[list, str, Optional[str], gr.Dropdown]:
+) -> AsyncIterator[Tuple[list, str, Optional[str], gr.Dropdown]]:
     """
-    Async chat handler — awaited directly by Gradio's event loop.
-    Saves user & assistant messages to PostgreSQL if user is logged in.
+    Stream natural-language Markdown into Gradio and persist only completed turns.
     """
     if not user_message.strip():
         choices = get_history_choices(user_state)
-        return history, "", active_session_id, gr.Dropdown(choices=choices, allow_custom_value=True)
+        yield history, "", active_session_id, gr.Dropdown(choices=choices, allow_custom_value=True)
+        return
 
-    if not os.getenv("GEMINI_API_KEY"):
+    if not (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")):
         bot_msg = "**API Key Missing!**\n\nPlease add your `GEMINI_API_KEY` to the `.env` file:\n```\nGEMINI_API_KEY=your_key_here\n```\nGet your key at: https://aistudio.google.com/app/apikey"
         history.append({"role": "user", "content": user_message})
         history.append({"role": "assistant", "content": bot_msg})
         choices = get_history_choices(user_state)
-        return history, "", active_session_id, gr.Dropdown(choices=choices, allow_custom_value=True)
+        yield history, "", active_session_id, gr.Dropdown(choices=choices, allow_custom_value=True)
+        return
 
     try:
         session_id = active_session_id
@@ -199,71 +220,51 @@ async def chat(
 
             db_save_chat_message(user_state["id"], session_id, "user", user_message)
 
-        result_obj, intent, is_api_used, engine_name, elapsed = await chat_with_autobot(user_message, history)
-        formatter = FORMATTERS.get(intent, format_general)
-        formatted = formatter(result_obj)
+        stream_history = list(history)
+        stream_history.append({"role": "user", "content": user_message})
+        stream_history.append({"role": "assistant", "content": ""})
+        choices = get_history_choices(user_state)
+        selected_val = session_id if any(c[1] == session_id for c in choices) else None
+        dropdown = gr.Dropdown(choices=choices, value=selected_val, allow_custom_value=True)
+        output_markdown = ""
+        intent_labels: tuple[str, ...] = ()
+        elapsed = 0.0
+        async for update in stream_chat_with_autobot(
+            user_message,
+            history,
+            user_id=user_state.get("id") if user_state else None,
+            session_id=session_id,
+        ):
+            output_markdown = update.content
+            if update.complete:
+                intent_labels = update.intents
+                elapsed = update.elapsed_seconds
+            else:
+                stream_history[-1] = {"role": "assistant", "content": output_markdown}
+                yield stream_history, "", session_id, dropdown
 
-        if engine_name == "Direct Math Engine":
-            meta_badge = f"\n\n---\n`⚡ Direct Math Engine` &nbsp;·&nbsp; `🎯 Intent: {intent}` &nbsp;·&nbsp; `⏱️ {elapsed}s`"
-        elif is_api_used:
-            meta_badge = f"\n\n---\n`⚡ Live Gemini 2.5 Flash API` &nbsp;·&nbsp; `🎯 Intent: {intent}` &nbsp;·&nbsp; `⏱️ {elapsed}s`"
-        else:
-            meta_badge = f"\n\n---\n`🟡 Local DB Engine (API Quota Fallback)` &nbsp;·&nbsp; `🎯 Intent: {intent}` &nbsp;·&nbsp; `⏱️ {elapsed}s`"
-
-        formatted += meta_badge
+        formatted = output_markdown + f"\n\n---\n`⚡ Gemini 2.5 Flash Automotive Agent` &nbsp;·&nbsp; `⏱️ {elapsed}s`"
+        stream_history[-1] = {"role": "assistant", "content": formatted}
 
         if user_state and "id" in user_state and session_id:
-            db_save_chat_message(user_state["id"], session_id, "assistant", formatted, intent=intent)
-
-        history.append({"role": "user", "content": user_message})
-        history.append({"role": "assistant", "content": formatted})
+            db_intent = ",".join(intent_labels) if intent_labels else "unclassified"
+            db_save_chat_message(user_state["id"], session_id, "assistant", formatted, intent=db_intent)
 
         choices = get_history_choices(user_state)
         selected_val = session_id if any(c[1] == session_id for c in choices) else None
-        return history, "", session_id, gr.Dropdown(choices=choices, value=selected_val, allow_custom_value=True)
+        yield stream_history, "", session_id, gr.Dropdown(choices=choices, value=selected_val, allow_custom_value=True)
 
     except Exception as e:
+        print(f"[UI] [ERROR] Chat request failed: {type(e).__name__}: {e}", flush=True)
         error_msg = f"**Error:** {str(e)}\n\nPlease check your API key and try again."
-        history.append({"role": "user", "content": user_message})
-        history.append({"role": "assistant", "content": error_msg})
+        if "stream_history" in locals():
+            stream_history[-1] = {"role": "assistant", "content": error_msg}
+        else:
+            history.append({"role": "user", "content": user_message})
+            history.append({"role": "assistant", "content": error_msg})
+            stream_history = history
         choices = get_history_choices(user_state)
-        return history, "", active_session_id, gr.Dropdown(choices=choices, allow_custom_value=True)
-
-
-# ─────────────────────────────────────────────
-# EMI Calculator Helper & DB Table Helper
-# ─────────────────────────────────────────────
-
-def compute_emi(car_name, price, down_pct, rate, months):
-    try:
-        down = price * (down_pct / 100)
-        principal = price - down
-        result = calculate_emi(principal, rate, int(months))
-        return (
-            result["monthly_emi"],
-            result["total_interest"],
-            result["total_payment"],
-            f"Down Payment: Rs.{down:,.0f} | Loan: {result['principal']}",
-        )
-    except Exception as e:
-        return f"Error: {e}", "", "", ""
-
-
-def get_cars_table():
-    cars = get_all_cars()
-    rows = []
-    for car in cars:
-        price = car["price_lakh"]
-        mileage = list(car["mileage_kmpl"].values())[0]
-        rows.append([
-            car["name"], car["brand"], car["segment"],
-            f"Rs.{price['min']}L - Rs.{price['max']}L",
-            ", ".join(car["fuel_type"]),
-            str(mileage),
-            str(car["seating"]),
-            ", ".join(car["transmission"]),
-        ])
-    return rows
+        yield stream_history, "", active_session_id, gr.Dropdown(choices=choices, allow_custom_value=True)
 
 
 # ─────────────────────────────────────────────
@@ -285,166 +286,167 @@ body, .gradio-container {
 .gradio-container { padding: 0 !important; max-width: 100% !important; }
 footer { display: none !important; }
 
-/* ── Authentication: calm, focused Claude-inspired workspace ── */
+/* ── Authentication: scoped, content-sized two-panel layout ── */
 #auth-view {
-    position: relative;
     min-height: 100vh;
-    padding: clamp(32px, 7vh, 76px) 24px 48px !important;
-    background: transparent !important;
-    color: #f3f0eb !important;
-    --block-background-fill: transparent;
-    --block-border-color: transparent;
-    --input-background-fill: #191918;
-    --input-border-color: #45423e;
-    --color-accent: #7397cf;
-    --color-accent-soft: rgba(115, 151, 207, 0.16);
-}
-
-#auth-view::before {
-    display: none;
-}
-
-.auth-mark {
-    display: inline-grid;
-    width: 38px;
-    height: 38px;
-    place-items: center;
-    margin-bottom: 14px;
-    border-radius: 12px;
-    background: #5a7eb5;
-    color: #fffaf5;
-    font-size: 19px;
-    box-shadow: 0 5px 14px rgba(51, 82, 126, 0.24);
-}
-
-.auth-brand {
-    font-family: 'Instrument Serif', Georgia, serif;
-    font-size: clamp(38px, 4vw, 48px);
-    font-weight: 400;
-    letter-spacing: -1.5px;
-    line-height: 1;
-    color: #f5f1ea;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: clamp(24px, 5vh, 48px) 20px !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
 }
 
 #auth-card {
-    position: relative;
-    width: min(1080px, 100%) !important;
-    min-height: 610px;
+    width: min(980px, 100%) !important;
     margin: 0 auto !important;
     padding: 0 !important;
     overflow: hidden !important;
-    background: #242321 !important;
-    border: 1px solid #3a3834 !important;
-    border-radius: 28px !important;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.34), 0 2px 5px rgba(0, 0, 0, 0.18) !important;
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 22px !important;
+    box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08) !important;
 }
 
 #auth-card > .wrap { padding: 0 !important; }
-.auth-layout { min-height: 610px !important; gap: 0 !important; }
-.auth-form-pane {
-    display: flex !important;
-    justify-content: center !important;
-    padding: 58px clamp(30px, 6vw, 78px) 38px !important;
-    background: #22211f !important;
-}
-.auth-form-inner { width: 100%; max-width: 385px; }
-.auth-form-heading { margin-bottom: 27px; }
-.auth-form-heading .auth-brand { margin-bottom: 10px; }
-.auth-form-heading p { color: #aaa39a; font-size: 13px; line-height: 1.55; }
-.auth-promo-pane {
-    position: relative;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-height: 610px;
-    overflow: hidden !important;
-    padding: 48px !important;
-    background: linear-gradient(135deg, #30476b 0%, #202d46 100%) !important;
-}
-.auth-promo-pane::before {
-    content: '';
-    position: absolute;
-    width: 720px;
-    height: 760px;
-    right: 42%;
-    top: -75px;
-    border-radius: 50%;
-    background: #22211f;
-}
-.auth-promo-copy { position: relative; z-index: 1; max-width: 330px; text-align: center; }
-.auth-promo-copy .auth-mark { margin-bottom: 22px; background: rgba(255,255,255,.12); box-shadow: none; }
-.auth-promo-copy h2 { color: #f6f8fc; font-size: clamp(30px, 3vw, 42px); font-weight: 650; letter-spacing: -.8px; line-height: 1.1; }
-.auth-promo-copy p { margin-top: 16px; color: #d8e2f3; font-size: 14px; line-height: 1.65; }
 
-#auth-card .tab-nav {
-    display: flex !important;
-    justify-content: center !important;
-    gap: 10px !important;
-    border-bottom: 1px solid #3b3935 !important;
+.auth-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 0 !important;
+    margin: 0 !important;
     padding: 0 !important;
 }
-#auth-card .tab-nav button {
+
+.auth-layout > .auth-form-pane,
+.auth-layout > .auth-promo-pane {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+}
+
+#auth-card .auth-form-pane {
     display: flex !important;
-    align-items: center !important;
+    flex-direction: column !important;
     justify-content: center !important;
+    align-items: center !important;
+    padding: 42px 44px !important;
+    background: #ffffff !important;
+    width: 100% !important;
+}
+#auth-card .auth-form-pane > .wrap,
+#auth-card .auth-form-inner > .wrap {
+    width: 100% !important;
+    min-height: 0 !important;
+}
+#auth-card .auth-form-inner {
+    width: 100% !important;
+    max-width: 420px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 0 0 auto !important;
+}
+
+#auth-card .auth-form-heading { margin: 0 0 26px !important; text-align: left; }
+#auth-card .auth-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-bottom: 12px;
+    border-radius: 10px;
+    background: rgba(93, 128, 182, 0.12);
+    color: #5d80b6;
+    font-size: 18px;
+}
+#auth-card .auth-brand {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-size: 32px;
+    font-weight: 500;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+    color: #0f172a;
+    margin-bottom: 5px;
+}
+#auth-card .auth-form-heading p { color: #64748b; font-size: 14px; line-height: 1.5; }
+
+/* Explicit switch buttons avoid Gradio Tabs' generated tab-nav sizing rules. */
+#auth-card .auth-tab-switch {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 12px !important;
+    width: 100% !important;
+    margin: 0 0 20px !important;
+}
+#auth-card .auth-tab-switch > * {
+    flex: 1 1 0% !important;
+    width: 50% !important;
+    min-width: 0 !important;
+}
+#auth-card button.auth-tab {
+    width: 100% !important;
     min-height: 42px !important;
-    width: 116px !important;
-    padding: 0 8px !important;
-    background: transparent !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    color: #98918a !important;
-    font-size: 15px !important;
+    height: 42px !important;
+    margin: 0 !important;
+    padding: 0 14px !important;
+    background: #f8fafc !important;
+    border: 1px solid #dbe3ee !important;
+    border-radius: 10px !important;
+    color: #64748b !important;
+    font-size: 14px !important;
     font-weight: 500 !important;
     box-shadow: none !important;
 }
-#auth-card .tab-nav button.selected,
-#auth-card .tab-nav button[aria-selected="true"] { color: #faf7f1 !important; border-bottom: 2px solid #7397cf !important; }
-#auth-card .tabitem { padding: 24px 4px 8px !important; }
-#auth-card .auth-tabs .form,
-#auth-card .auth-tabs form {
-    margin: 0 !important;
-    padding: 0 !important;
-    background: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
+#auth-card button.auth-tab.is-active {
+    background: #eff5ff !important;
+    border-color: #5d80b6 !important;
+    color: #0f172a !important;
+    font-weight: 600 !important;
 }
 
-/* Each textbox has an explicit class so Gradio's shared form container
-   never receives an input border or background. */
+/* Form fields, status, and guest action all share auth-form-inner's width. */
+#auth-card .auth-panel { width: 100% !important; min-height: 0 !important; }
+#auth-card .auth-panel > .wrap { padding: 0 !important; min-height: 0 !important; }
+#auth-card .auth-field-label {
+    display: block;
+    margin: 0 0 6px;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
 #auth-card .auth-input {
     display: block !important;
-    margin: 0 0 16px !important;
+    margin: 0 0 14px !important;
     padding: 0 !important;
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
+    width: 100% !important;
 }
-#auth-card .auth-input:last-of-type { margin-bottom: 18px !important; }
-#auth-card .auth-input label,
-#auth-card .auth-input .block-label span {
-    color: #d6d0c8 !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.01em !important;
-}
+#auth-card .auth-input:last-of-type { margin-bottom: 0 !important; }
 
 #auth-card .auth-input .input-container {
     display: flex !important;
     align-items: center !important;
     width: 100% !important;
     min-height: 46px !important;
-    margin-top: 6px !important;
+    margin-top: 0 !important;
     padding: 0 !important;
     overflow: hidden !important;
-    background: #1b1a19 !important;
-    border: 1px solid #45423e !important;
-    border-radius: 9px !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 10px !important;
     box-shadow: none !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
 }
 #auth-card .auth-input .input-container:focus-within {
-    border-color: #7397cf !important;
-    box-shadow: 0 0 0 3px rgba(115, 151, 207, 0.16) !important;
+    border-color: #5d80b6 !important;
+    box-shadow: 0 0 0 3px rgba(93, 128, 182, 0.15) !important;
 }
 #auth-card .auth-input input {
     display: block !important;
@@ -452,27 +454,18 @@ footer { display: none !important; }
     height: 44px !important;
     min-height: 44px !important;
     margin: 0 !important;
-    padding: 0 13px !important;
+    padding: 0 14px !important;
     background: transparent !important;
     border: 0 !important;
     border-radius: 0 !important;
-    color: #f4f0ea !important;
+    color: #0f172a !important;
     font-size: 14px !important;
     line-height: 44px !important;
     box-shadow: none !important;
 }
-#auth-card .auth-input input::placeholder { color: #89837c !important; }
+#auth-card .auth-input input::placeholder { color: #94a3b8 !important; }
 #auth-card .auth-input input:focus { outline: 0 !important; box-shadow: none !important; }
-.auth-field-label {
-    display: block;
-    margin: 0 0 7px;
-    color: #d6d0c8;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: .01em;
-}
 
-/* Reset broad Gradio textbox wrappers: only .form-group controls get a box. */
 #auth-card .gr-textbox,
 #auth-card [data-testid="textbox"] {
     background: transparent !important;
@@ -480,137 +473,234 @@ footer { display: none !important; }
     box-shadow: none !important;
 }
 
-.auth-primary,
-button.auth-primary {
+/* Primary CTA Button */
+#auth-card .auth-primary,
+#auth-card button.auth-primary {
     width: 100% !important;
     min-height: 46px !important;
-    margin-top: 8px !important;
-    border: 1px solid #6689be !important;
-    border-radius: 9px !important;
+    height: 46px !important;
+    margin-top: 20px !important;
+    border: none !important;
+    border-radius: 10px !important;
     background: #5d80b6 !important;
-    color: #fffdfa !important;
+    color: #ffffff !important;
     font-size: 14px !important;
     font-weight: 600 !important;
-    box-shadow: 0 2px 4px rgba(37, 61, 98, 0.28) !important;
-    transition: background .18s ease, transform .18s ease, box-shadow .18s ease !important;
+    box-shadow: 0 2px 6px rgba(93, 128, 182, 0.25) !important;
+    transition: background 0.15s ease, box-shadow 0.15s ease !important;
 }
-.auth-primary:hover { background: #4f71a5 !important; transform: translateY(-1px) !important; box-shadow: 0 5px 12px rgba(37, 61, 98, 0.34) !important; }
-.auth-primary:active { transform: translateY(0) !important; }
-
-#auth-status { min-height: 0; margin: 0 !important; }
-#auth-status > div { margin: 7px 0 0 !important; border-radius: 8px !important; }
-.guest-divider { margin: 18px 0 10px; padding-top: 17px; border-top: 1px solid #3b3935; text-align: center; }
-.guest-divider span { color: #aaa39a !important; font-size: 12px; }
-.guest-button,
-button.guest-button { width: 100% !important; margin: 0 0 10px !important; min-height: 40px !important; background: transparent !important; border: 1px solid #4a4742 !important; border-radius: 9px !important; color: #e0dad2 !important; font-size: 13px !important; font-weight: 500 !important; box-shadow: none !important; }
-.guest-button:hover { background: #302e2b !important; border-color: #686158 !important; }
-
-@media (max-width: 760px) {
-    #auth-view { padding: 32px 14px !important; }
-    #auth-view::before { inset: 8px; border-radius: 16px; }
-    #auth-card { min-height: 0; border-radius: 18px !important; }
-    .auth-layout { min-height: 0 !important; flex-direction: column !important; }
-    .auth-form-pane { padding: 38px 24px 30px !important; }
-    .auth-promo-pane { min-height: 225px; padding: 38px 26px !important; }
-    .auth-promo-pane::before { display: none; }
-    .auth-promo-copy { max-width: 390px; }
-    .auth-promo-copy .auth-mark { display: none; }
-    .auth-promo-copy h2 { font-size: 28px; }
+#auth-card .auth-primary:hover {
+    background: #4f71a5 !important;
+    box-shadow: 0 4px 12px rgba(93, 128, 182, 0.35) !important;
 }
 
-/* ── Top Header Navigation Bar ── */
+/* Status Notification Component (Hidden when empty) */
+#auth-card #auth-status { display: none; min-height: 0 !important; margin: 0 !important; padding: 0 !important; }
+#auth-card #auth-status:not(:empty) { display: block !important; }
+#auth-card #auth-status > div { margin: 12px 0 0 !important; padding: 10px 14px !important; border-radius: 8px !important; font-size: 13px !important; font-weight: 500 !important; }
+
+/* Guest Section (Secondary CTA inside Form Pane) */
+#auth-card .guest-divider {
+    margin: 24px 0 10px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+    text-align: center;
+    width: 100%;
+}
+#auth-card .guest-divider span { color: #64748b !important; font-size: 12px; }
+#auth-card .guest-button,
+#auth-card button.guest-button {
+    width: 100% !important;
+    margin: 0 !important;
+    min-height: 46px !important;
+    height: 46px !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 10px !important;
+    color: #334155 !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    box-shadow: none !important;
+    transition: background 0.15s ease, border-color 0.15s ease !important;
+}
+.guest-button:hover { background: #f8fafc !important; border-color: #94a3b8 !important; }
+
+/* The promo pane is a grid sibling that naturally matches the form pane's height. */
+#auth-card .auth-promo-pane {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+    padding: 44px !important;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+    box-sizing: border-box !important;
+}
+#auth-card .auth-promo-pane > .wrap { width: 100% !important; }
+#auth-card .auth-promo-copy {
+    max-width: 320px;
+    text-align: center;
+}
+#auth-card .auth-promo-copy .auth-mark {
+    margin-bottom: 20px;
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: #ffffff !important;
+    box-shadow: none;
+}
+#auth-card .auth-promo-copy h2 {
+    color: #ffffff !important;
+    font-size: 32px !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.5px !important;
+    line-height: 1.2 !important;
+    margin-bottom: 12px !important;
+}
+#auth-card .auth-promo-copy p {
+    margin-top: 0 !important;
+    color: #94a3b8 !important;
+    font-size: 14px !important;
+    line-height: 1.6 !important;
+}
+
+@media (max-width: 768px) {
+    #auth-view { padding: 24px 16px !important; }
+    #auth-card { border-radius: 16px !important; width: 100% !important; }
+    .auth-layout { grid-template-columns: minmax(0, 1fr) !important; }
+    .auth-layout > .auth-form-pane, .auth-layout > .auth-promo-pane { width: 100% !important; }
+    #auth-card .auth-form-pane { padding: 32px 20px !important; }
+    #auth-card .auth-promo-pane { padding: 32px 20px !important; }
+    #auth-card .auth-promo-copy { max-width: 360px; }
+    #auth-card .auth-promo-copy .auth-mark { display: none !important; }
+    #auth-card .auth-promo-copy h2 { font-size: 24px !important; }
+}
+
+/* ── Main Chat App Shell: Sleek Full-Viewport Crisp White Theme ── */
+html, body, #root, .gradio-container {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+}
+
+.gradio-container, .gradio-container > .main, #main-view > .wrap {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+}
+
+#main-view {
+    --color-accent: #5d80b6;
+    --color-accent-soft: rgba(93, 128, 182, 0.12);
+    min-height: 100vh !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+}
+
+#main-view > .wrap { padding: 0 !important; }
+
 .top-navbar {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    min-height: 58px !important;
-    padding: 10px clamp(18px, 3vw, 42px) !important;
-    background: #161616 !important;
-    border-bottom: 1px solid #262626 !important;
+    min-height: 64px !important;
+    padding: 0 28px !important;
+    background: #ffffff !important;
+    border-bottom: 2px solid #111827 !important;
+    box-shadow: none !important;
 }
 
-#main-view {
-    --color-accent: #7397cf;
-    --color-accent-soft: rgba(115, 151, 207, 0.16);
+.app-workspace {
+    min-height: calc(100vh - 64px) !important;
+    gap: 0 !important;
+    background: #ffffff !important;
 }
 
-/* ── Tight Aligned Sidebar Panel ── */
+/* Sidebar */
 .sidebar-panel {
-    background: #161616 !important;
-    border: 1px solid #292929 !important;
-    border-radius: 14px !important;
-    min-height: 540px !important;
-    padding: 16px !important;
+    position: sticky !important;
+    top: 64px !important;
+    height: calc(100vh - 64px) !important;
+    min-height: 0 !important;
+    padding: 24px 20px !important;
+    background: #f9fafb !important;
+    border: 0 !important;
+    border-right: 2px solid #111827 !important;
+    border-radius: 0 !important;
     display: flex !important;
     flex-direction: column !important;
-    justify-content: flex-start !important;
+    justify-content: space-between !important;
+    overflow: hidden auto !important;
 }
 
 .sidebar-top-group {
     display: flex !important;
     flex-direction: column !important;
-    gap: 4px !important;
+    gap: 14px !important;
     flex-grow: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
 }
 
 .sidebar-top-group > * {
-    margin-bottom: 8px !important;
+    margin-bottom: 0 !important;
     flex-grow: 0 !important;
 }
 
 .sidebar-bottom-group {
     margin-top: auto !important;
-    padding-top: 12px !important;
-    border-top: 1px solid #262626 !important;
+    padding-top: 20px !important;
+    border-top: 1px solid #e5e7eb !important;
     flex-grow: 0 !important;
 }
 
 .sidebar-brand {
     font-family: 'Instrument Serif', Georgia, serif !important;
     font-size: 24px !important;
-    font-weight: 500 !important;
-    color: #f0f0f0 !important;
+    font-weight: 600 !important;
+    color: #111827 !important;
     letter-spacing: -0.3px !important;
     margin-bottom: 12px !important;
     padding-left: 2px !important;
 }
 
-/* Compact Sidebar Buttons */
+/* Sidebar Controls */
 .sidebar-panel button,
 .btn-new-chat,
 button.btn-new-chat {
-    min-height: 34px !important;
-    max-height: 34px !important;
-    height: 34px !important;
-    padding: 4px 10px !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-    border-radius: 8px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    height: 44px !important;
+    padding: 0 16px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    border-radius: 12px !important;
     box-shadow: none !important;
     text-align: left !important;
-    background: rgba(255, 255, 255, 0.05) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    color: #e3e3e3 !important;
-    margin-bottom: 4px !important;
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    color: #111827 !important;
+    margin-bottom: 0 !important;
     width: 100% !important;
 }
 
 .sidebar-panel button:hover,
 .btn-new-chat:hover {
-    background: rgba(115, 151, 207, 0.15) !important;
-    border-color: #7397cf !important;
-    color: #9bb8e4 !important;
+    background: #f0f4fa !important;
+    border-color: #5d80b6 !important;
+    color: #5d80b6 !important;
 }
 
-.sidebar-title {
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.08em !important;
-    text-transform: uppercase !important;
-    color: #888888 !important;
-    margin: 0 0 5px 2px !important;
+.sidebar-title, h1, h2, h3, h4, h5, h6 {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    color: #111827 !important;
+    margin: 0 0 8px 0 !important;
 }
 
 /* Dropdown Container Overrides */
@@ -618,190 +708,260 @@ button.btn-new-chat {
 .history-select > div,
 .history-select select,
 .history-select input {
-    background: #1e1e1e !important;
-    border: 1px solid #2e2e2e !important;
-    border-radius: 8px !important;
-    color: #e3e3e3 !important;
-    font-size: 12px !important;
-    min-height: 32px !important;
-    max-height: 34px !important;
-    height: 32px !important;
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 12px !important;
+    color: #111827 !important;
+    font-size: 13px !important;
+    min-height: 44px !important;
+    max-height: 46px !important;
+    height: 44px !important;
 }
 
 .btn-delete-chat,
 button.btn-delete-chat {
-    min-height: 26px !important;
-    max-height: 26px !important;
-    height: 26px !important;
-    padding: 2px 8px !important;
-    font-size: 11px !important;
-    font-weight: 500 !important;
-    background: transparent !important;
-    border: 1px solid rgba(239, 68, 68, 0.3) !important;
-    color: #f87171 !important;
-    border-radius: 6px !important;
-    margin-top: 4px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    height: 42px !important;
+    padding: 0 14px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    background: #ffffff !important;
+    border: 1px solid #fca5a5 !important;
+    color: #ef4444 !important;
+    border-radius: 12px !important;
+    margin-top: 0 !important;
     width: 100% !important;
 }
 .btn-delete-chat:hover {
-    background: rgba(239, 68, 68, 0.15) !important;
-    border-color: #ef4444 !important;
-    color: #f87171 !important;
+    background: #fef2f2 !important;
+    border-color: #dc2626 !important;
 }
 
 .btn-logout,
 button.btn-logout {
-    min-height: 26px !important;
-    max-height: 26px !important;
-    height: 26px !important;
-    padding: 2px 8px !important;
-    font-size: 11px !important;
-    background: transparent !important;
-    border: 1px solid #333333 !important;
-    color: #888888 !important;
-    border-radius: 6px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    height: 38px !important;
+    padding: 0 18px !important;
+    font-size: 13px !important;
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    color: #374151 !important;
+    border-radius: 10px !important;
 }
 .btn-logout:hover {
-    background: rgba(255, 255, 255, 0.08) !important;
-    color: #e3e3e3 !important;
+    background: #f3f4f6 !important;
+    color: #111827 !important;
 }
 
 /* Main Chat Area */
 .main-chat-area {
-    padding: 22px clamp(20px, 3vw, 40px) 30px !important;
-    background: #1b1b1b !important;
+    min-height: calc(100vh - 64px) !important;
+    padding: 20px clamp(24px, 5vw, 72px) 22px !important;
+    background: #ffffff !important;
 }
 
-.main-chat-area > .wrap { max-width: 1320px !important; margin: 0 auto !important; }
-.main-chat-area .tab-nav { margin-bottom: 14px !important; }
-.main-chat-area .tab-nav button { min-height: 38px !important; padding: 0 12px !important; }
+.main-chat-area > .wrap {
+    max-width: 1080px !important;
+    height: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+}
+
+.chat-shell {
+    min-height: calc(100vh - 104px) !important;
+    background: transparent !important;
+    border: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+}
+
+/* Chatbot Outer Container (Single Clean Boundary) */
 .chatbot-main {
     overflow: hidden !important;
-    border: 1px solid #303139 !important;
-    border-radius: 14px !important;
-    background: #17181b !important;
-}
-.chatbot-main > .wrap { background: #17181b !important; }
-
-.pill-row {
-    margin-top: 8px !important;
-    gap: 6px !important;
-    flex-wrap: wrap !important;
-    justify-content: center !important;
+    border: 2px solid #111827 !important;
+    border-radius: 16px !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    flex: 1 1 auto !important;
 }
 
-/* Floating Capsule Input Bar */
+.chatbot-main > .wrap {
+    background: #ffffff !important;
+    padding: 20px 24px !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+/* Explicit Reset for Inner Gradio Containers */
+.chatbot-main .wrap,
+.chatbot-main .message-wrap,
+.chatbot-main .message-row,
+.chatbot-main .bubble-wrap,
+.chatbot-main .avatar-container,
+.chatbot-main .avatar {
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+.chatbot-main .message-wrap,
+.chatbot-main .message-row {
+    margin-bottom: 20px !important;
+}
+
+/* Hide Avatar Column & Gap */
+.chatbot-main .avatar-container,
+.chatbot-main .avatar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+}
+
+.chatbot-main,
+.chatbot-main *:not(button):not(svg):not(path) {
+    color: #111827 !important;
+}
+
+.chatbot-main button[aria-label*="Copy"],
+.chatbot-main button[title*="Copy"],
+.chatbot-main button[aria-label*="Share"],
+.chatbot-main button[title*="Share"],
+.chatbot-main .message-buttons,
+.chatbot-main .message-actions {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Floating Input Bar (Matching 16px Radius) */
 .floating-input-bar {
     width: 100% !important;
-    background: transparent !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-    margin: 16px auto 0 !important;
+    max-width: 1080px !important;
+    background: #f9fafb !important;
+    border: 2px solid #111827 !important;
+    border-radius: 16px !important;
+    padding: 8px 12px 8px 20px !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05) !important;
+    margin: 18px auto 0 !important;
 }
 
-.floating-input-bar > .wrap > .row { align-items: center !important; gap: 10px !important; }
+.floating-input-bar > .wrap {
+    padding: 0 !important;
+}
+.floating-input-bar > .wrap > .row {
+    align-items: center !important;
+    gap: 10px !important;
+}
 .floating-input-bar .block { min-width: 0 !important; }
-.floating-input-bar .input-container {
-    min-height: 44px !important;
-    background: #202126 !important;
-    border: 1px solid #3a3d47 !important;
-    border-radius: 12px !important;
-}
-.floating-input-bar textarea {
-    min-height: 42px !important;
-    background: transparent !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-}
 
 .floating-input-bar textarea {
     background: transparent !important;
     border: none !important;
-    outline: none !important;
-    color: #f0f0f0 !important;
-    font-size: 14px !important;
+    color: #111827 !important;
+    font-size: 15px !important;
     font-family: 'Inter', sans-serif !important;
-    padding: 4px 2px !important;
+    padding: 14px 16px !important;
     resize: none !important;
-    caret-color: #7397cf !important;
+    caret-color: #5d80b6 !important;
 }
-.floating-input-bar textarea::placeholder { color: #888888 !important; }
+.floating-input-bar textarea::placeholder { color: #6b7280 !important; }
 
 /* Action Send Button */
 .send-button,
 button.send-button {
-    background: #5d80b6 !important;
+    background: linear-gradient(135deg, #5d80b6, #30476b) !important;
     border: none !important;
-    border-radius: 10px !important;
+    border-radius: 12px !important;
     color: white !important;
     font-weight: 600 !important;
-    font-size: 13px !important;
-    padding: 6px 16px !important;
+    font-size: 14px !important;
+    padding: 0 22px !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    box-shadow: 0 4px 14px rgba(93, 128, 182, 0.3) !important;
 }
 .send-button:hover {
-    background: #4f71a5 !important;
+    background: linear-gradient(135deg, #7397cf, #4f71a5) !important;
     transform: translateY(-1px) !important;
 }
 
-/* Suggestion Pill Cards */
-.claude-pill-card,
-button.claude-pill-card {
-    background: #262626 !important;
-    border: 1px solid #333333 !important;
-    border-radius: 14px !important;
-    padding: 5px 14px !important;
-    color: #e3e3e3 !important;
-    font-size: 12px !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    min-height: 30px !important;
-    max-height: 32px !important;
-}
-.claude-pill-card:hover {
-    background: #333333 !important;
-    border-color: #444444 !important;
-    color: #ffffff !important;
-}
-
-/* Chatbot Messages */
+/* Chatbot Message Bubbles */
 .message.user {
-    background: #2a2a38 !important;
-    color: #f0f0f0 !important;
-    border-radius: 18px 18px 4px 18px !important;
-    padding: 12px 18px !important;
-    max-width: 75% !important;
+    background: #f3f4f6 !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 16px !important;
+    padding: 12px 16px !important;
+    max-width: min(760px, 72%) !important;
     margin-left: auto !important;
-    font-size: 14px !important;
+    margin-right: 0 !important;
+    font-size: 15px !important;
 }
 .message.bot {
     background: transparent !important;
-    border: none !important;
-    color: #e3e3e3 !important;
-    padding: 12px 4px !important;
-    max-width: 90% !important;
-    font-size: 14px !important;
+    border: 0 !important;
+    color: #111827 !important;
+    padding: 14px 0 !important;
+    max-width: min(860px, 86%) !important;
+    margin-right: auto !important;
+    margin-left: 0 !important;
+    font-size: 15px !important;
     line-height: 1.7 !important;
 }
 
 /* Disclaimer text */
 .disclaimer-text {
     text-align: center;
-    font-size: 11px;
-    color: #777777;
-    margin-top: 6px;
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 12px;
+}
+
+.feature-list {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+}
+.feature-item {
+    display: flex;
+    align-items: center;
+    min-height: 28px;
+    color: #4b5563 !important;
+    font-size: 13px;
+}
+.sync-note {
+    color: #6b7280 !important;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+    .app-workspace { flex-direction: column !important; }
+    .sidebar-panel {
+        position: relative !important;
+        top: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        border-right: 0 !important;
+        border-bottom: 2px solid #111827 !important;
+    }
+    .main-chat-area { padding: 16px !important; }
+    .chatbot-main { border-radius: 16px !important; }
+    .message.user,
+    .message.bot { max-width: 94% !important; }
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #333333; border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 """
 
 QUICK_PROMPTS = [
@@ -820,8 +980,50 @@ QUICK_PROMPTS = [
 # Build UI
 # ─────────────────────────────────────────────
 
+# ─────────────────────────────────────────────
+# Force-light theme: Gradio's Default() theme carries separate
+# "_dark" variants for every color variable and auto-activates them
+# when the OS/browser prefers dark mode. Overriding classes in CSS
+# alone can't reach that — the components read the theme variables
+# directly. So we pin every *_dark variable to the same light value
+# used by the CSS above, eliminating the dark variant entirely.
+# ─────────────────────────────────────────────
+FORCED_LIGHT_THEME = gr.themes.Default().set(
+    body_background_fill="#ffffff",
+    body_background_fill_dark="#ffffff",
+    background_fill_primary="#ffffff",
+    background_fill_primary_dark="#ffffff",
+    background_fill_secondary="#f9fafb",
+    background_fill_secondary_dark="#f9fafb",
+    block_background_fill="#ffffff",
+    block_background_fill_dark="#ffffff",
+    body_text_color="#111827",
+    body_text_color_dark="#111827",
+    block_label_text_color="#111827",
+    block_label_text_color_dark="#111827",
+    input_background_fill="#ffffff",
+    input_background_fill_dark="#ffffff",
+    border_color_primary="#e5e7eb",
+    border_color_primary_dark="#e5e7eb",
+)
+
+# Belt-and-suspenders: also strip any 'dark' class Gradio adds to
+# <body>/<html> at load time, in case a future Gradio version still
+# toggles a class-based dark mode alongside the theme variables.
+FORCE_LIGHT_JS = """
+() => {
+    document.body.classList.remove('dark');
+    document.documentElement.classList.remove('dark');
+}
+"""
+
+
 def build_ui():
-    with gr.Blocks(title="AutoBot — AI Automobile Assistant") as demo:
+    with gr.Blocks(
+        title="AutoBot — AI Automobile Assistant",
+        theme=FORCED_LIGHT_THEME,
+        js=FORCE_LIGHT_JS,
+    ) as demo:
 
         # Session States
         user_state = gr.State(value=None)
@@ -843,31 +1045,36 @@ def build_ui():
                             </div>
                             """)
 
-                            with gr.Tabs(elem_classes="auth-tabs"):
-                                with gr.Tab("Sign In"):
-                                    gr.HTML("<label class='auth-field-label'>Username or Email</label>")
-                                    login_id_input = gr.Textbox(show_label=False, placeholder="alex or alex@example.com", lines=1, elem_classes="auth-input")
-                                    gr.HTML("<label class='auth-field-label'>Password</label>")
-                                    login_pw_input = gr.Textbox(show_label=False, type="password", placeholder="••••••••", lines=1, elem_classes="auth-input")
-                                    login_btn = gr.Button("Sign In", variant="primary", size="lg", elem_classes="auth-primary")
+                            # Explicit buttons + visible panels are more stable than styling
+                            # Gradio Tabs' generated tab-nav/tabitem wrappers.
+                            with gr.Row(elem_classes="auth-tab-switch"):
+                                login_tab_btn = gr.Button("Sign In", elem_classes=["auth-tab", "is-active"])
+                                signup_tab_btn = gr.Button("Sign Up", elem_classes=["auth-tab"])
 
-                                with gr.Tab("Sign Up"):
-                                    gr.HTML("<label class='auth-field-label'>Username</label>")
-                                    signup_name_input = gr.Textbox(show_label=False, placeholder="alex", lines=1, elem_classes="auth-input")
-                                    gr.HTML("<label class='auth-field-label'>Email</label>")
-                                    signup_email_input = gr.Textbox(show_label=False, placeholder="alex@example.com", lines=1, elem_classes="auth-input")
-                                    gr.HTML("<label class='auth-field-label'>Password</label>")
-                                    signup_pw_input = gr.Textbox(show_label=False, type="password", placeholder="At least 6 characters", lines=1, elem_classes="auth-input")
-                                    signup_btn = gr.Button("Create Account", variant="primary", size="lg", elem_classes="auth-primary")
+                            with gr.Column(visible=True, elem_classes="auth-panel") as login_form:
+                                gr.HTML("<label class='auth-field-label'>Username or Email</label>")
+                                login_id_input = gr.Textbox(show_label=False, placeholder="alex or alex@example.com", lines=1, elem_classes="auth-input")
+                                gr.HTML("<label class='auth-field-label'>Password</label>")
+                                login_pw_input = gr.Textbox(show_label=False, type="password", placeholder="••••••••", lines=1, elem_classes="auth-input")
+                                login_btn = gr.Button("Sign In", variant="primary", size="lg", elem_classes="auth-primary")
+
+                            with gr.Column(visible=False, elem_classes="auth-panel") as signup_form:
+                                gr.HTML("<label class='auth-field-label'>Username</label>")
+                                signup_name_input = gr.Textbox(show_label=False, placeholder="alex", lines=1, elem_classes="auth-input")
+                                gr.HTML("<label class='auth-field-label'>Email</label>")
+                                signup_email_input = gr.Textbox(show_label=False, placeholder="alex@example.com", lines=1, elem_classes="auth-input")
+                                gr.HTML("<label class='auth-field-label'>Password</label>")
+                                signup_pw_input = gr.Textbox(show_label=False, type="password", placeholder="At least 6 characters", lines=1, elem_classes="auth-input")
+                                signup_btn = gr.Button("Create Account", variant="primary", size="lg", elem_classes="auth-primary")
 
                             auth_status = gr.HTML("", elem_id="auth-status")
 
                             gr.HTML("""
                             <div class="guest-divider">
-                                <span>Don't want to save history?</span>
+                                <span>Use without saving history</span>
                             </div>
                             """)
-                            guest_btn = gr.Button("Continue as Guest →", variant="secondary", size="sm", elem_classes="guest-button")
+                            guest_btn = gr.Button("Continue as Guest", variant="secondary", size="sm", elem_classes="guest-button")
 
                     with gr.Column(scale=1, min_width=360, elem_classes="auth-promo-pane"):
                         gr.HTML("""
@@ -887,22 +1094,21 @@ def build_ui():
             with gr.Row(elem_classes="top-navbar"):
                 gr.HTML("""
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="font-family:'Instrument Serif', Georgia, serif;font-size:24px;color:#ececec;"><span style="color:#7397cf;">✴️</span> AutoBot</span>
-                    <span style="font-size:11px;color:#888888;">AI Automobile Assistant</span>
+                    <span style="font-family:'Instrument Serif', Georgia, serif;font-size:24px;color:#111827;font-weight:600;"><span style="color:#5d80b6;">✦</span> AutoBot</span>
+                    <span style="font-size:12px;color:#6b7280;font-weight:500;">AI Automobile Assistant</span>
                 </div>
                 """)
                 with gr.Row():
-                    gr.HTML("<span style='background:#262626;border:1px solid #333333;color:#888888;padding:4px 12px;border-radius:16px;font-size:11px;'>Free plan · gemini-2.5-flash</span>")
-                    user_badge_md = gr.HTML("<span style='color:#e3e3e3;font-weight:600;'>Guest User</span>")
-                    logout_btn = gr.Button("Sign Out 🚪", size="sm", elem_classes="btn-logout")
+                    user_badge_md = gr.HTML("<span style='color:#111827;font-weight:700;'>Guest User</span>")
+                    logout_btn = gr.Button("Sign Out", size="sm", elem_classes="btn-logout")
 
-            with gr.Row():
+            with gr.Row(elem_classes="app-workspace"):
 
                 # ── Left Aligned Sidebar Panel (Recent Chats Layout) ──
                 with gr.Column(scale=1, min_width=240, elem_classes="sidebar-panel"):
                     with gr.Column(elem_classes="sidebar-top-group"):
-                        gr.HTML("<div class='sidebar-title'>🕒 Recent Chats</div>")
-                        new_chat_btn = gr.Button("+ New Chat 📝", size="sm", elem_classes="btn-new-chat")
+                        gr.HTML("<div class='sidebar-title'>Recent Chats</div>")
+                        new_chat_btn = gr.Button("+ New Chat", size="sm", elem_classes="btn-new-chat")
                         
                         history_dropdown = gr.Dropdown(
                             label="",
@@ -913,95 +1119,74 @@ def build_ui():
                             elem_classes="history-select",
                             container=False,
                         )
-                        delete_history_btn = gr.Button("Delete Selected Chat 🗑️", size="sm", elem_classes="btn-delete-chat")
+                        delete_history_btn = gr.Button("Delete Selected Chat", size="sm", elem_classes="btn-delete-chat")
                         history_status = gr.HTML("")
 
                         gr.HTML("""
-                        <div style="margin-top:14px;padding-top:10px;border-top:1px solid #262626;">
-                            <div class="sidebar-title">⚡ Features</div>
-                            <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#888888;">
-                                <div>🚗 Car Buying & Comparison</div>
-                                <div>🔧 Issue Diagnostics & Repair</div>
-                                <div>📅 Milestone Service Cost</div>
-                                <div>💰 Loan & EMI Calculation</div>
+                        <div class="feature-list">
+                            <div class="sidebar-title">Capabilities</div>
+                            <div style="display:flex;flex-direction:column;gap:4px;">
+                                <div class="feature-item">Car buying and comparison</div>
+                                <div class="feature-item">Issue diagnostics and repair</div>
+                                <div class="feature-item">Milestone service planning</div>
+                                <div class="feature-item">Loan and EMI calculation</div>
                             </div>
                         </div>
                         """)
 
                     # Bottom User Profile Footer Card
                     with gr.Column(elem_classes="sidebar-bottom-group"):
-                        gr.HTML("<div style='font-size:11px;color:#888888;'>Logged in & synced to PostgreSQL</div>")
+                        gr.HTML("<div class='sync-note'>Conversations sync to PostgreSQL when signed in.</div>")
 
                 # ── Main Central Chat Area ──
                 with gr.Column(scale=4, elem_classes="main-chat-area"):
-
-                    # Main Application Tabs
-                    with gr.Tabs(elem_classes="tab-nav"):
-
-                        # ══ Tab 1 — Chat Canvas ═════════════════
-                        with gr.Tab("💬 Chat Canvas"):
-
-                            chatbot = gr.Chatbot(
-                                value=[],
-                                height=520,
-                                elem_classes="chatbot-main",
-                                show_label=False,
-                                layout="bubble",
-                                placeholder="""
-<div style="text-align:center; padding: 40px 20px 20px 20px;">
-    <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 38px; font-weight: 400; color: #ececec; letter-spacing: -0.5px; line-height: 1.2;">
-        <span style="color: #7397cf; margin-right: 6px;">✴️</span> Good day,
+                    with gr.Column(elem_classes="chat-shell"):
+                        chatbot = gr.Chatbot(
+                            value=[],
+                            height="calc(100vh - 190px)",
+                            elem_classes="chatbot-main",
+                            show_label=False,
+                            layout="bubble",
+                            container=False,
+                            placeholder="""
+<div style="text-align:center; padding: 18vh 20px 20px 20px;">
+    <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 42px; font-weight: 400; color: #111827; letter-spacing: -0.5px; line-height: 1.2;">
+        <span style="color: #5d80b6; margin-right: 8px;">✦</span> Good day,
     </div>
-    <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 36px; font-weight: 400; color: #c4c4c4; margin-top: 4px;">
+    <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 40px; font-weight: 400; color: #374151; margin-top: 6px;">
         What would you like to explore today?
     </div>
 </div>
 """,
-                            )
+                        )
 
-                            # Floating Pill Input Bar (Replicated Layout from Image)
-                            with gr.Column(elem_classes="floating-input-bar"):
-                                with gr.Row():
-                                    msg_input = gr.Textbox(
-                                        placeholder="Ask Anything about Cars...",
-                                        show_label=False,
-                                        lines=1,
-                                        max_lines=4,
-                                        container=False,
-                                        scale=6,
-                                    )
-                                    send_btn = gr.Button("Calculate →", variant="primary", elem_classes="send-button", scale=1)
+                        with gr.Column(elem_classes="floating-input-bar"):
+                            with gr.Row():
+                                msg_input = gr.Textbox(
+                                    placeholder="Ask anything about cars",
+                                    show_label=False,
+                                    lines=1,
+                                    max_lines=4,
+                                    container=False,
+                                    scale=7,
+                                )
+                                send_btn = gr.Button("Send", variant="primary", elem_classes="send-button", scale=1)
 
-                            gr.HTML("<div class='disclaimer-text'>Responses may be inaccurate. Be sure to verify important details</div>")
-
-                        # ══ Tab 2 — Car Database ════════════════
-                        with gr.Tab("🗄️ Car Database"):
-                            gr.HTML("""
-                            <div style="padding: 24px 0 16px 0;">
-                                <h2 style="font-size:20px;font-weight:700;color:#ececec;margin-bottom:4px;">Car Database</h2>
-                                <p style="color:#888888;font-size:13px;">All cars available in the AutoBot knowledge base</p>
-                            </div>
-                            """)
-                            gr.Dataframe(
-                                value=get_cars_table(),
-                                headers=["Car", "Brand", "Segment", "Price", "Fuel", "Mileage (km/l)", "Seats", "Transmission"],
-                                interactive=False,
-                                wrap=True,
-                                elem_classes="dataframe",
-                            )
-
-                        # ══ Tab 3 — Guide ═══════════════════════
-                        with gr.Tab("📖 Guide"):
-                            gr.Markdown("""
-## How to Use AutoBot
-
-### User Accounts & History
-- **Sign Up / Sign In**: Authenticate on the landing screen to save your chat sessions.
-- **Saved Chats**: Your chat history is stored securely in PostgreSQL and listed in the **Recent Chats** sidebar.
-- **Auto-Load**: Changing the dropdown selection in the sidebar immediately loads past conversations.
-""")
+                        gr.HTML("<div class='disclaimer-text'>Responses may be inaccurate. Be sure to verify important details</div>")
 
         # ── Event Wire Up ───────────────────────────
+        login_tab_btn.click(
+            fn=show_login_form,
+            inputs=[],
+            outputs=[login_form, signup_form, login_tab_btn, signup_tab_btn],
+        )
+
+        signup_tab_btn.click(
+            fn=show_signup_form,
+            inputs=[],
+            outputs=[login_form, signup_form, login_tab_btn, signup_tab_btn],
+        )
+
         login_btn.click(
             fn=on_login,
             inputs=[login_id_input, login_pw_input],

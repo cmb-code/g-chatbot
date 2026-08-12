@@ -3,22 +3,16 @@ AutoBot — AI Automobile Assistant
 Entry point: builds the Gradio UI and launches the server.
 
 Architecture:
-    main.py           ← you are here (launch only)
+    main.py           ← launch entry point
     ui/
         app.py        ← Gradio UI layout & event wiring
         formatters.py ← GFM markdown response formatters
     agents/
-        car_agent.py        ← master orchestrator
-        query_agent.py      ← intent detection + entity extraction
-        recommend_agent.py  ← car recommendation (Pydantic AI)
-        diagnostic_agent.py ← vehicle diagnostics (Pydantic AI)
-        service_agent.py    ← service schedule (Pydantic AI)
-        emi_agent.py        ← EMI calculator (pure math)
-        general_agent.py    ← general Q&A (direct Gemini call)
+        automotive_agent.py ← Single LLM-Led Pydantic AI Automotive Agent
     models/
         schemas.py    ← Pydantic response schemas
     tools/
-        car_tools.py  ← PostgreSQL query helpers & EMI math
+        car_tools.py  ← Database query helpers & EMI math
     db/
         connection.py ← PostgreSQL pool + TTL cache
         queries.py    ← DB query helpers
@@ -40,14 +34,14 @@ load_dotenv()
 from db.connection import validate_db_config
 validate_db_config()
 
-from ui.app import build_ui, PREMIUM_CSS
+from ui.app import PREMIUM_CSS, build_ui
 
 
 if __name__ == "__main__":
     demo = build_ui()
     for port in range(7860, 7870):
         try:
-            print(f"Attempting to launch AutoBot on port {port}...")
+            print(f"[AUTOBOT] [STARTUP] Launching server on port {port}...", flush=True)
             demo.launch(
                 server_name="0.0.0.0",
                 server_port=port,
@@ -59,4 +53,4 @@ if __name__ == "__main__":
         except OSError:
             if port == 7869:
                 raise
-            print(f"Port {port} is occupied, trying next port...")
+            print(f"[AUTOBOT] [STARTUP] Port {port} is occupied; trying the next port...", flush=True)
