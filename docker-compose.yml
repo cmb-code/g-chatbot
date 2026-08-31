@@ -1,0 +1,43 @@
+
+
+
+# ─────────────────────────────────────────────────────────────────
+# AutoBot — Local Development Services
+#
+# Runs PostgreSQL as an isolated Docker service.
+# AutoBot (main.py / api_server.py) still runs locally on your machine.
+#
+# Usage:
+#   docker compose up -d        ← start postgres in background
+#   docker compose down         ← stop postgres (data preserved)
+#   docker compose down -v      ← stop AND delete all data (fresh start)
+#   docker compose logs -f db   ← stream postgres logs
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  db:
+    image: postgres:16
+    container_name: autobot-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: autobot
+      POSTGRES_PASSWORD: autobot123
+      POSTGRES_DB: autobot_db
+
+    ports:
+      - "5433:5432"     # 5432 is used by local postgres; Docker postgres listens on 5433
+
+    volumes:
+      - autobot_pgdata:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autobot -d autobot_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  autobot_pgdata:
+    driver: local

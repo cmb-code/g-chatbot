@@ -12,7 +12,7 @@ the agents don't know or care whether data comes from JSON or PostgreSQL.
 """
 
 from __future__ import annotations
-from typing import Any, Optional
+from typing import Optional
 from .connection import get_conn, get_cache
 
 

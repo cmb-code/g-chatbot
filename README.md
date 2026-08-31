@@ -20,30 +20,36 @@ AutoBot is an intelligent, full-stack automobile assistant tailored for the **In
 ## 🏗️ Architecture & Workflow
 
 ```text
-                               ┌──────────────────────────┐
-                               │   Gradio Web UI (7860)   │
-                               └────────────┬─────────────┘
-                                            │ Streams response tokens
-                                            ▼
-                               ┌──────────────────────────┐
-                               │ Pydantic AI Agent        │
-                               │ (Gemini 3.6 Flash)       │
-                               └────────────┬─────────────┘
-                                            │ Calls LLM-selected tools
-                                            ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ Safe Tool Boundary (Parameterised SQL & Pure Math)                                     │
-│                                                                                        │
-│  • record_intent_classification    • search_catalog_by_segment   • get_vehicle          │
-│  • search_catalog                  • search_catalog_by_fuel      • search_known_issue   │
-│  • search_catalog_by_budget        • calculate_loan_emi          • get_service_intervals│
-└───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                            │
-                                            ▼
-                               ┌──────────────────────────┐
-                               │  PostgreSQL + TTL Cache  │
-                               │  (5-Min Per-Key Expiry)  │
-                               └──────────────────────────┘
+ ┌─────────────────────────────┐       ┌──────────────────────────────────┐
+ │    Gradio Web UI (:7860)    │       │    FastAPI REST/SSE API (:8000)   │
+ │    (existing, unchanged)    │       │    POST /chat  POST /chat/sync    │
+ │                             │       │    POST /auth/signup  /auth/login │
+ │                             │       │    GET /sessions/{id}/history     │
+ │                             │       │    GET /health                    │
+ └──────────────┬──────────────┘       └─────────────────┬────────────────┘
+                │  stream_chat_with_autobot()              │  stream/chat_with_autobot()
+                └──────────────────┬───────────────────────┘
+                                   ▼
+                      ┌────────────────────────┐
+                      │   Pydantic AI Agent    │
+                      │   (Gemini 2.5 Flash)   │
+                      └────────────┬───────────┘
+                                   │ LLM-selected tools
+                                   ▼
+ ┌─────────────────────────────────────────────────────────────────────────┐
+ │ Safe Tool Boundary (Parameterised SQL & Pure Math)                      │
+ │  • record_intent_classification   • search_catalog_by_segment           │
+ │  • search_catalog                 • search_catalog_by_fuel              │
+ │  • search_catalog_by_budget       • search_known_issue                  │
+ │  • get_vehicle                    • calculate_loan_emi                  │
+ │  • get_standard_service_intervals                                       │
+ └────────────────────────────────┬────────────────────────────────────────┘
+                                  │
+                                  ▼
+                     ┌────────────────────────┐
+                     │  PostgreSQL + TTLCache │
+                     │  (5-Min Per-Key Expiry)│
+                     └────────────────────────┘
 ```
 
 ---
@@ -52,32 +58,46 @@ AutoBot is an intelligent, full-stack automobile assistant tailored for the **In
 
 ```text
 Auto-Bot/
-├── main.py                     # Entry point — launches Gradio app on ports 7860–7869
-├── requirements.txt            # Python dependencies (pydantic-ai, google-genai, gradio, etc.)
-├── .env.example                # Template for environment configuration
+├── main.py                     # Gradio entrypoint — launches UI on port 7860
+├── api_server.py               # FastAPI entrypoint — launches REST API on port 8000
+├── run_all.py                  # Dev convenience — starts both servers from one command
+├── docker-compose.yml          # Docker Compose — PostgreSQL service for local dev
+├── requirements.txt            # Python dependencies
+├── .env.example                # Environment variable template
+│
+├── api/                        # ── FastAPI Layer ────────────────────────────────────
+│   ├── app.py                  # FastAPI app factory, CORS, startup warm-up, routers
+│   ├── schemas.py              # Pydantic request/response models
+│   ├── dependencies.py         # asyncio.to_thread wrappers for sync DB calls
+│   ├── logger.py               # Centralized logging configuration
+│   └── routers/
+│       ├── health.py           # GET /health
+│       ├── chat.py             # POST /chat (SSE) + POST /chat/sync
+│       ├── auth.py             # POST /auth/signup + POST /auth/login
+│       └── sessions.py         # GET /sessions/{session_id}/history
 │
 ├── agents/
-│   └── automotive_agent.py     # Pydantic AI Agent setup, system prompt, and 8 evidence tools
+│   └── automotive_agent.py     # Pydantic AI Agent, system prompt, 9 tools
 │
 ├── tools/
-│   └── car_tools.py            # Helper wrappers for DB queries and loan EMI math
+│   └── car_tools.py            # DB query helpers & EMI math
 │
 ├── db/
 │   ├── connection.py           # ThreadedConnectionPool (min=2, max=10) & TTLCache
-│   ├── queries.py              # Parameterised SQL queries for cars, issues, service & chat
-│   ├── fuzzy_queries.py        # RapidFuzz fuzzy search engine & synonym/alias maps
-│   ├── auth.py                 # User signup, login & PBKDF2 password hashing
+│   ├── queries.py              # Parameterised SQL queries
+│   ├── fuzzy_queries.py        # RapidFuzz fuzzy search engine
+│   ├── auth.py                 # PBKDF2 password hashing & user auth
 │   └── migrate.py              # DDL schema migration & seed data loader
 │
 ├── models/
-│   └── schemas.py              # Pydantic domain models (QueryPlan, FuzzyCarFilter)
+│   └── schemas.py              # Pydantic domain models
 │
 ├── ui/
-│   ├── app.py                  # Gradio UI components, theme CSS, auth & event wiring
-│   └── formatters.py           # Markdown response formatters and card generators
+│   ├── app.py                  # Gradio SPA UI
+│   └── formatters.py           # Markdown formatters
 │
 └── data/
-    └── seed.json               # Seed database for catalogue cars, issues, and service items
+    └── seed.json               # Seed data for PostgreSQL
 ```
 
 ---
@@ -108,8 +128,8 @@ AutoBot classifies every request into one or more of the following **5 Intent Ca
 
 ### 1. Prerequisites
 - **Python 3.10+**
-- **PostgreSQL Database** (Local or Cloud — e.g. Supabase, Neon, Render)
-- **Google Gemini API Key** (Get a free key from [Google AI Studio](https://aistudio.google.com/app/apikey))
+- **Docker Desktop** (for running PostgreSQL locally) — [Download here](https://www.docker.com/products/docker-desktop/)
+- **Google Gemini API Key** — [Get a free key from Google AI Studio](https://aistudio.google.com/app/apikey)
 
 ### 2. Installation
 
@@ -127,35 +147,167 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Environment Configuration
+### 3. Database — PostgreSQL via Docker Compose (Recommended)
 
-Create a `.env` file in the project root:
+AutoBot ships with a `docker-compose.yml` that spins up a dedicated PostgreSQL 16 container with a
+persistent named volume. This is the recommended approach for local development — no cloud account or
+system-wide Postgres installation needed.
+
+#### Start PostgreSQL
+
+```bash
+docker compose up -d
+```
+
+Docker will pull `postgres:16` (first run only, ~200 MB), create the database, user, and volume, and
+start the container in the background.
+
+#### Verify the container is healthy
+
+```bash
+docker compose ps
+```
+
+Expected output:
+```
+NAME               IMAGE         STATUS              PORTS
+autobot-postgres   postgres:16   Up (healthy)        0.0.0.0:5433->5432/tcp
+```
+
+#### View live PostgreSQL logs
+
+```bash
+docker compose logs -f db
+```
+
+#### Daily workflow
+
+```bash
+docker compose up -d      # Morning — start Postgres
+docker compose down       # Evening — stop Postgres (data is preserved)
+docker compose down -v    # Fresh wipe — stops AND deletes all data
+```
+
+#### Inspect database values from terminal
+
+```bash
+# Open an interactive psql shell inside the container
+docker exec -it autobot-postgres psql -U autobot -d autobot_db
+
+# Inside psql:
+\dt                                          -- list all tables
+SELECT name, brand, segment FROM cars;       -- browse car catalog
+SELECT id, username, email FROM users;       -- browse registered users
+SELECT session_id, title FROM conversations; -- browse saved chats
+\q                                           -- exit
+```
+
+```bash
+# Or check row counts in one command (no psql shell needed)
+docker exec autobot-postgres psql -U autobot -d autobot_db \
+  -c "SELECT tablename, n_live_tup AS rows FROM pg_stat_user_tables ORDER BY rows DESC;"
+```
+
+> **Note on port**: The container maps Docker's internal port `5432` to your local port **`5433`**.
+> This avoids conflicts if you also have a system-level PostgreSQL running on `5432`.
+
+---
+
+### 4. Environment Configuration
+
+Copy the template and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
 
 ```env
 # Gemini API Key (Required)
 GEMINI_API_KEY=your_gemini_api_key_here
 
-# PostgreSQL Connection String (Required)
-DATABASE_URL=postgresql://postgres:password@localhost:5432/autobot_db
+# PostgreSQL — Docker Compose (port 5433 avoids clash with local Postgres on 5432)
+DATABASE_URL=postgresql://autobot:autobot123@localhost:5433/autobot_db
+
+# Optional overrides
+GEMINI_MODEL=gemini-3.6-flash
+LOG_LEVEL=INFO
 ```
 
-### 4. Database Setup & Migration
+> **Cloud alternative**: If you prefer Supabase, Neon, or Render instead of Docker,
+> set `DATABASE_URL` to your cloud connection string and skip the `docker compose` step.
 
-Run the migration script to create tables (`cars`, `common_issues`, `service_intervals`, `users`, `conversations`, `chat_messages`) and seed data:
+---
+
+### 5. Database Setup & Migration
+
+Run the migration script to create all 6 tables and seed the Indian car catalog:
 
 ```bash
 python db/migrate.py
 ```
 
-### 5. Launch the Application
+Expected output:
+```
+✅  Migration complete!
+   • cars:              8 rows
+   • common_issues:     5 rows
+   • service_intervals: 10 rows
+```
 
-Start the server:
+### 6. Launch the Application
+
+#### Option A — Gradio UI only
 
 ```bash
 python main.py
 ```
 
-Open your browser at `http://localhost:7860` (if port 7860 is occupied, it automatically tries ports 7861–7869).
+Open your browser at `http://localhost:7860`.
+
+#### Option B — FastAPI REST/SSE API only
+
+```bash
+python api_server.py
+```
+
+API available at `http://localhost:8000` · Interactive docs at `http://localhost:8000/docs`.
+
+#### Option C — Both servers together (recommended for development)
+
+```bash
+python run_all.py
+```
+
+Starts Gradio on `:7860` and FastAPI on `:8000` as separate processes. Press `Ctrl+C` to stop both.
+
+---
+
+### 6. FastAPI Quick Reference
+
+| Method | Endpoint | Description |
+|:--|:--|:--|
+| `GET` | `/health` | Liveness check — DB + agent status |
+| `POST` | `/chat` | SSE streaming chat |
+| `POST` | `/chat/sync` | Non-streaming chat, returns full JSON |
+| `POST` | `/auth/signup` | Register a new user |
+| `POST` | `/auth/login` | Authenticate, returns user record |
+| `GET` | `/sessions/{id}/history` | Load past conversation messages |
+
+**Example — sync chat:**
+```bash
+curl -X POST http://localhost:8000/chat/sync \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Show me petrol SUVs under 15 lakhs"}'
+```
+
+**Example — SSE streaming:**
+```bash
+curl -N -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Calculate EMI for 10L at 9% for 5 years"}'
+```
 
 ---
 

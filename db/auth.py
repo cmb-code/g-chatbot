@@ -7,8 +7,6 @@ user registration (sign up), and credential authentication (login).
 
 import hashlib
 import hmac
-import os
-import re
 import secrets
 from typing import Optional, Tuple
 
@@ -48,15 +46,16 @@ def verify_password(password: str, stored_hash: str) -> bool:
 # User Account Operations (Sign Up & Login)
 # ─────────────────────────────────────────────
 
-def db_create_user(username: str, email: str, password: str) -> Tuple[bool, str, Optional[dict]]:
+def db_create_user(username: Optional[str], email: Optional[str], password: Optional[str]) -> Tuple[bool, str, Optional[dict]]:
     """
     Registers a new user in the PostgreSQL users table.
 
     Returns:
         (success, message, user_dict_or_none)
     """
-    username = username.strip()
-    email = email.strip().lower()
+    username = (username or "").strip()
+    email = (email or "").strip().lower()
+    password = password or ""
 
     if not username or len(username) < 3:
         return False, "Username must be at least 3 characters long.", None
@@ -96,14 +95,15 @@ def db_create_user(username: str, email: str, password: str) -> Tuple[bool, str,
         return False, f"Failed to create account: {str(e)}", None
 
 
-def db_authenticate_user(username_or_email: str, password: str) -> Tuple[bool, str, Optional[dict]]:
+def db_authenticate_user(username_or_email: Optional[str], password: Optional[str]) -> Tuple[bool, str, Optional[dict]]:
     """
     Authenticates a user by username or email and password.
 
     Returns:
         (success, message, user_dict_or_none)
     """
-    identifier = username_or_email.strip().lower()
+    identifier = (username_or_email or "").strip().lower()
+    password = password or ""
     if not identifier or not password:
         return False, "Please enter both username/email and password.", None
 

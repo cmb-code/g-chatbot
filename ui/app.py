@@ -10,7 +10,6 @@ Layout Specifications Replicated from Architecture:
 """
 
 import os
-import time
 import uuid
 from collections.abc import AsyncIterator
 from typing import Optional, Tuple
@@ -55,7 +54,7 @@ def on_login(username_or_email: str, password: str):
     success, msg, user_dict = db_authenticate_user(username_or_email, password)
     if success and user_dict:
         choices = get_history_choices(user_dict)
-        dropdown_update = gr.Dropdown(choices=choices, value=None, interactive=True, allow_custom_value=True)
+        radio_update = gr.Radio(choices=choices, value=None, interactive=True)
         status_html = f"<div style='color:#34d399;font-weight:600;font-size:13px;padding:8px;background:rgba(52,211,153,0.1);border-radius:8px;margin-top:8px;'>✅ {msg}</div>"
         user_badge = f"<span style='color:#24262d;font-weight:600;'>{user_dict['username']}</span><br/><span style='color:#7b818c;font-size:11px;'>Free plan</span>"
         return (
@@ -63,7 +62,7 @@ def on_login(username_or_email: str, password: str):
             status_html,                                        # auth_status
             gr.Column(visible=False),                           # auth_view (hide)
             gr.Column(visible=True),                            # main_view (show)
-            dropdown_update,                                    # history_dropdown
+            radio_update,                                       # history_radio
             user_badge,                                         # user_badge_md
         )
     else:
@@ -73,7 +72,7 @@ def on_login(username_or_email: str, password: str):
             status_html,                                        # auth_status
             gr.Column(visible=True),                            # auth_view (keep visible)
             gr.Column(visible=False),                           # main_view (keep hidden)
-            gr.Dropdown(choices=[], value=None, allow_custom_value=True), # history_dropdown
+            gr.Radio(choices=[], value=None),                   # history_radio
             "<span style='color:#24262d;font-weight:600;'>Guest User</span><br/><span style='color:#7b818c;font-size:11px;'>Free plan</span>",
         )
 
@@ -83,7 +82,7 @@ def on_signup(username: str, email: str, password: str):
     success, msg, user_dict = db_create_user(username, email, password)
     if success and user_dict:
         choices = get_history_choices(user_dict)
-        dropdown_update = gr.Dropdown(choices=choices, value=None, interactive=True, allow_custom_value=True)
+        radio_update = gr.Radio(choices=choices, value=None, interactive=True)
         status_html = f"<div style='color:#34d399;font-weight:600;font-size:13px;padding:8px;background:rgba(52,211,153,0.1);border-radius:8px;margin-top:8px;'>✅ {msg}</div>"
         user_badge = f"<span style='color:#e3e3e3;font-weight:600;'>{user_dict['username']}</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>"
         return (
@@ -91,7 +90,7 @@ def on_signup(username: str, email: str, password: str):
             status_html,
             gr.Column(visible=False),                           # auth_view (hide)
             gr.Column(visible=True),                            # main_view (show)
-            dropdown_update,
+            radio_update,
             user_badge,
         )
     else:
@@ -101,7 +100,7 @@ def on_signup(username: str, email: str, password: str):
             status_html,
             gr.Column(visible=True),
             gr.Column(visible=False),
-            gr.Dropdown(choices=[], value=None, allow_custom_value=True),
+            gr.Radio(choices=[], value=None),
             "<span style='color:#e3e3e3;font-weight:600;'>Guest User</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>",
         )
 
@@ -113,7 +112,7 @@ def on_guest():
         "",                                                     # auth_status
         gr.Column(visible=False),                               # auth_view (hide)
         gr.Column(visible=True),                                # main_view (show)
-        gr.Dropdown(choices=[], value=None, interactive=False, allow_custom_value=True), # history_dropdown
+        gr.Radio(choices=[], value=None, interactive=False),    # history_radio
         "<span style='color:#24262d;font-weight:600;'>Guest User</span><br/><span style='color:#7b818c;font-size:11px;'>Free plan</span>",
     )
 
@@ -127,7 +126,7 @@ def on_logout():
         "<div style='color:#94a3b8;font-size:13px;padding:8px;'>Signed out successfully.</div>", # auth_status
         gr.Column(visible=True),                                # auth_view (show)
         gr.Column(visible=False),                               # main_view (hide)
-        gr.Dropdown(choices=[], value=None, interactive=False, allow_custom_value=True), # history_dropdown
+        gr.Radio(choices=[], value=None, interactive=False),    # history_radio
         "<span style='color:#24262d;font-weight:600;'>Guest User</span><br/><span style='color:#7b818c;font-size:11px;'>Free plan</span>",
         "", "", "", "", ""                                      # clear inputs
     )
@@ -155,7 +154,7 @@ def show_signup_form():
 
 def on_new_chat(user_state: Optional[dict]) -> Tuple[None, list, str]:
     """Clears chatbot UI and starts a new conversation session."""
-    return None, [], "<div style='color:#34d399;font-size:12px;margin-top:4px;'>✨ New chat session started.</div>"
+    return None, [], ""
 
 
 def on_select_history(session_id: str, user_state: Optional[dict]) -> Tuple[str, list, str]:
@@ -167,21 +166,21 @@ def on_select_history(session_id: str, user_state: Optional[dict]) -> Tuple[str,
         formatted_history = []
         for m in raw_msgs:
             formatted_history.append({"role": m["role"], "content": m["content"]})
-        return session_id, formatted_history, f"<div style='color:#7397cf;font-size:12px;margin-top:4px;'>📂 Loaded chat ({len(formatted_history)} msgs)</div>"
+        return session_id, formatted_history, ""
     except Exception as e:
         return "", [], f"<div style='color:#f87171;font-size:12px;margin-top:4px;'>Error loading chat: {e}</div>"
 
 
-def on_delete_history(session_id: str, user_state: Optional[dict]) -> Tuple[None, list, gr.Dropdown, str]:
+def on_delete_history(session_id: str, user_state: Optional[dict]) -> Tuple[None, list, gr.Radio, str]:
     """Deletes selected conversation from database and updates history UI."""
     if not session_id or not user_state or "id" not in user_state:
-        return None, [], gr.Dropdown(choices=[], allow_custom_value=True), "<div style='color:#f87171;font-size:12px;margin-top:4px;'>No chat selected to delete.</div>"
+        return None, [], gr.Radio(choices=[], value=None), "<div style='color:#f87171;font-size:12px;margin-top:4px;'>No chat selected to delete.</div>"
     try:
         db_delete_conversation(session_id, user_state["id"])
         choices = get_history_choices(user_state)
-        return None, [], gr.Dropdown(choices=choices, value=None, allow_custom_value=True), "<div style='color:#34d399;font-size:12px;margin-top:4px;'>🗑️ Deleted conversation.</div>"
+        return None, [], gr.Radio(choices=choices, value=None), ""
     except Exception as e:
-        return session_id, [], gr.Dropdown(choices=[], allow_custom_value=True), f"<div style='color:#f87171;font-size:12px;margin-top:4px;'>Error deleting: {e}</div>"
+        return session_id, [], gr.Radio(choices=[], value=None), f"<div style='color:#f87171;font-size:12px;margin-top:4px;'>Error deleting: {e}</div>"
 
 
 # ─────────────────────────────────────────────
@@ -193,13 +192,13 @@ async def chat(
     history: list,
     user_state: Optional[dict],
     active_session_id: Optional[str]
-) -> AsyncIterator[Tuple[list, str, Optional[str], gr.Dropdown]]:
+) -> AsyncIterator[Tuple[list, str, Optional[str], gr.Radio]]:
     """
     Stream natural-language Markdown into Gradio and persist only completed turns.
     """
     if not user_message.strip():
         choices = get_history_choices(user_state)
-        yield history, "", active_session_id, gr.Dropdown(choices=choices, allow_custom_value=True)
+        yield history, "", active_session_id, gr.Radio(choices=choices)
         return
 
     if not (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")):
@@ -207,7 +206,7 @@ async def chat(
         history.append({"role": "user", "content": user_message})
         history.append({"role": "assistant", "content": bot_msg})
         choices = get_history_choices(user_state)
-        yield history, "", active_session_id, gr.Dropdown(choices=choices, allow_custom_value=True)
+        yield history, "", active_session_id, gr.Radio(choices=choices)
         return
 
     try:
@@ -215,9 +214,9 @@ async def chat(
         if user_state and "id" in user_state:
             if not session_id:
                 session_id = str(uuid.uuid4())
-                title = user_message.strip()[:50]
-                db_create_conversation(user_state["id"], session_id, title)
-
+            
+            title = user_message.strip()[:50] or "New Conversation"
+            db_create_conversation(user_state["id"], session_id, title)
             db_save_chat_message(user_state["id"], session_id, "user", user_message)
 
         stream_history = list(history)
@@ -225,7 +224,7 @@ async def chat(
         stream_history.append({"role": "assistant", "content": ""})
         choices = get_history_choices(user_state)
         selected_val = session_id if any(c[1] == session_id for c in choices) else None
-        dropdown = gr.Dropdown(choices=choices, value=selected_val, allow_custom_value=True)
+        radio = gr.Radio(choices=choices, value=selected_val)
         output_markdown = ""
         intent_labels: tuple[str, ...] = ()
         elapsed = 0.0
@@ -241,7 +240,7 @@ async def chat(
                 elapsed = update.elapsed_seconds
             else:
                 stream_history[-1] = {"role": "assistant", "content": output_markdown}
-                yield stream_history, "", session_id, dropdown
+                yield stream_history, "", session_id, radio
 
         formatted = output_markdown + f"\n\n---\n`⚡ Gemini 2.5 Flash Automotive Agent` &nbsp;·&nbsp; `⏱️ {elapsed}s`"
         stream_history[-1] = {"role": "assistant", "content": formatted}
@@ -252,7 +251,7 @@ async def chat(
 
         choices = get_history_choices(user_state)
         selected_val = session_id if any(c[1] == session_id for c in choices) else None
-        yield stream_history, "", session_id, gr.Dropdown(choices=choices, value=selected_val, allow_custom_value=True)
+        yield stream_history, "", session_id, gr.Radio(choices=choices, value=selected_val)
 
     except Exception as e:
         print(f"[UI] [ERROR] Chat request failed: {type(e).__name__}: {e}", flush=True)
@@ -264,7 +263,7 @@ async def chat(
             history.append({"role": "assistant", "content": error_msg})
             stream_history = history
         choices = get_history_choices(user_state)
-        yield stream_history, "", active_session_id, gr.Dropdown(choices=choices, allow_custom_value=True)
+        yield stream_history, "", active_session_id, gr.Radio(choices=choices)
 
 
 # ─────────────────────────────────────────────
@@ -703,19 +702,82 @@ button.btn-new-chat {
     margin: 0 0 8px 0 !important;
 }
 
-/* Dropdown Container Overrides */
-.history-select,
-.history-select > div,
-.history-select select,
-.history-select input {
-    background: #ffffff !important;
-    border: 1px solid #d1d5db !important;
-    border-radius: 12px !important;
-    color: #111827 !important;
+/* History List (Claude-style Radio List) */
+.history-select {
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-height: 240px !important;
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+}
+
+.history-select fieldset {
+    border: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+}
+
+/* Hide Radio Dot Circle completely */
+.history-select input[type="radio"] {
+    display: none !important;
+    appearance: none !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+/* Choice Wrapper & Labels */
+.history-select label {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    padding: 8px 12px !important;
+    border-radius: 10px !important;
     font-size: 13px !important;
-    min-height: 44px !important;
-    max-height: 46px !important;
-    height: 44px !important;
+    font-weight: 500 !important;
+    color: #374151 !important;
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    transition: all 0.15s ease !important;
+    margin: 0 !important;
+}
+
+/* Text Span inside Label for Ellipsis */
+.history-select label span {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    width: 100% !important;
+    display: block !important;
+}
+
+/* Hover State */
+.history-select label:hover {
+    background: #f0f4fa !important;
+    border-color: #5d80b6 !important;
+    color: #5d80b6 !important;
+}
+
+/* Selected State */
+.history-select label.selected,
+.history-select label:has(input:checked) {
+    background: rgba(93, 128, 182, 0.12) !important;
+    border-color: #5d80b6 !important;
+    color: #5d80b6 !important;
+    font-weight: 600 !important;
 }
 
 .btn-delete-chat,
@@ -790,12 +852,16 @@ button.btn-logout {
 
 .chatbot-main > .wrap {
     background: #ffffff !important;
-    padding: 20px 24px !important;
+    padding: 24px 28px !important;
     border: 0 !important;
     box-shadow: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    height: 100% !important;
 }
 
-/* Explicit Reset for Inner Gradio Containers */
+/* Explicit Reset for Inner Gradio Containers & Guaranteed Vertical Flow */
 .chatbot-main .wrap,
 .chatbot-main .message-wrap,
 .chatbot-main .message-row,
@@ -807,8 +873,18 @@ button.btn-logout {
     background: transparent !important;
 }
 
-.chatbot-main .message-wrap,
+.chatbot-main .message-wrap {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+    width: 100% !important;
+}
+
 .chatbot-main .message-row {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    clear: both !important;
     margin-bottom: 20px !important;
 }
 
@@ -834,6 +910,7 @@ button.btn-logout {
 .chatbot-main button[title*="Share"],
 .chatbot-main .message-buttons,
 .chatbot-main .message-actions {
+    display: none !important;
     opacity: 0 !important;
     pointer-events: none !important;
 }
@@ -892,28 +969,36 @@ button.send-button {
     transform: translateY(-1px) !important;
 }
 
-/* Chatbot Message Bubbles */
+/* Chatbot Message Bubbles: User on Right, Bot on Left (Sequential, Never Overlapping) */
 .message.user {
+    display: block !important;
     background: #f3f4f6 !important;
     color: #111827 !important;
     border: 1px solid #e5e7eb !important;
-    border-radius: 16px !important;
-    padding: 12px 16px !important;
-    max-width: min(760px, 72%) !important;
+    border-radius: 14px !important;
+    padding: 12px 18px !important;
+    width: fit-content !important;
+    max-width: min(700px, 80%) !important;
     margin-left: auto !important;
     margin-right: 0 !important;
+    margin-bottom: 16px !important;
     font-size: 15px !important;
+    box-sizing: border-box !important;
+    clear: both !important;
 }
 .message.bot {
+    display: block !important;
     background: transparent !important;
     border: 0 !important;
     color: #111827 !important;
-    padding: 14px 0 !important;
-    max-width: min(860px, 86%) !important;
+    padding: 4px 0 16px 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
     margin-right: auto !important;
     margin-left: 0 !important;
     font-size: 15px !important;
-    line-height: 1.7 !important;
+    line-height: 1.75 !important;
+    clear: both !important;
 }
 
 /* Disclaimer text */
@@ -964,17 +1049,6 @@ button.send-button {
 ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 """
 
-QUICK_PROMPTS = [
-    ("🚗", "Best SUV under Rs.15L for family"),
-    ("🔧", "Car vibrates at high speed"),
-    ("📅", "Hyundai Creta service at 45000km"),
-    ("🏎️", "Honda City vs Creta comparison"),
-    ("⚡", "Tata Nexon EV vs Petrol"),
-    ("🛢️", "Engine overheating — what to do?"),
-    ("🔩", "Brake pad replacement cost"),
-    ("🚦", "Tips to improve fuel efficiency"),
-]
-
 
 # ─────────────────────────────────────────────
 # Build UI
@@ -1010,10 +1084,150 @@ FORCED_LIGHT_THEME = gr.themes.Default().set(
 # Belt-and-suspenders: also strip any 'dark' class Gradio adds to
 # <body>/<html> at load time, in case a future Gradio version still
 # toggles a class-based dark mode alongside the theme variables.
-FORCE_LIGHT_JS = """
+AUTO_ROUTER_JS = """
 () => {
+    // 1. Force light theme
     document.body.classList.remove('dark');
     document.documentElement.classList.remove('dark');
+
+    // 2. Extract Route from Query Param (if redirected from F5 refresh / direct URL)
+    const getTargetRoute = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const routeParam = urlParams.get('route');
+        if (routeParam) {
+            history.replaceState({}, '', routeParam);
+            return routeParam;
+        }
+        return window.location.pathname;
+    };
+
+    // 3. State-Driven URL Route Sync
+    const syncUrlWithState = () => {
+        const authView = document.getElementById('auth-view');
+        const mainView = document.getElementById('main-view');
+
+        const isMainVisible = mainView && (!mainView.classList.contains('hidden') && getComputedStyle(mainView).display !== 'none');
+        const isAuthVisible = authView && (!authView.classList.contains('hidden') && getComputedStyle(authView).display !== 'none');
+
+        if (isMainVisible) {
+            const checkedRadio = document.querySelector('.history-select input[type="radio"]:checked');
+            let targetPath = '/chat';
+            if (checkedRadio && checkedRadio.value) {
+                targetPath = '/chat/' + checkedRadio.value;
+            }
+            if (window.location.pathname !== targetPath) {
+                if (checkedRadio && checkedRadio.value) {
+                    history.pushState({}, '', targetPath);
+                } else if (window.location.pathname === '/login' || window.location.pathname === '/signup' || window.location.pathname === '/') {
+                    history.replaceState({}, '', '/chat');
+                }
+            }
+        } else if (isAuthVisible) {
+            const signupForm = document.querySelector('.auth-panel:nth-of-type(2)');
+            const isSignup = signupForm && (!signupForm.classList.contains('hidden') && getComputedStyle(signupForm).display !== 'none');
+            const targetPath = isSignup ? '/signup' : '/login';
+            if (window.location.pathname !== targetPath && (window.location.pathname.startsWith('/chat') || window.location.pathname === '/')) {
+                history.replaceState({}, '', targetPath);
+            }
+        }
+    };
+
+    // Initial checks and continuous state sync
+    setTimeout(syncUrlWithState, 200);
+    setTimeout(syncUrlWithState, 600);
+    setInterval(syncUrlWithState, 500);
+
+    // Watch for DOM visibility changes on auth-view and main-view
+    const observer = new MutationObserver(syncUrlWithState);
+    setTimeout(() => {
+        const authView = document.getElementById('auth-view');
+        const mainView = document.getElementById('main-view');
+        if (authView) observer.observe(authView, { attributes: true, attributeFilter: ['style', 'class'], subtree: true });
+        if (mainView) observer.observe(mainView, { attributes: true, attributeFilter: ['style', 'class'], subtree: true });
+    }, 400);
+
+    // 4. Initial URL Route Sync on Load for direct links / redirects
+    const handleRoute = () => {
+        const route = getTargetRoute();
+        if (route === '/signup') {
+            const btns = document.querySelectorAll('.auth-tab');
+            if (btns.length >= 2 && !btns[1].classList.contains('is-active')) {
+                btns[1].click();
+            }
+        } else if (route === '/login') {
+            const btns = document.querySelectorAll('.auth-tab');
+            if (btns.length >= 1 && !btns[0].classList.contains('is-active')) {
+                btns[0].click();
+            }
+        } else if (route.startsWith('/chat/')) {
+            const sessionId = route.replace('/chat/', '');
+            if (sessionId && sessionId !== 'new') {
+                setTimeout(() => {
+                    const radioInputs = document.querySelectorAll('.history-select input[type="radio"]');
+                    for (const inp of radioInputs) {
+                        if (inp.value === sessionId) {
+                            inp.click();
+                            break;
+                        }
+                    }
+                }, 500);
+            }
+        }
+    };
+    setTimeout(handleRoute, 250);
+
+    // 5. Radio Item Click Sync
+    document.addEventListener('click', (e) => {
+        const historyContainer = e.target.closest('.history-select');
+        if (historyContainer) {
+            const labelOrItem = e.target.closest('label') || e.target.closest('.wrap > *');
+            if (labelOrItem) {
+                const radio = labelOrItem.querySelector('input[type="radio"]') || (e.target.tagName === 'INPUT' ? e.target : null);
+                if (radio && radio.value) {
+                    history.pushState({}, '', '/chat/' + radio.value);
+                }
+            }
+            setTimeout(() => {
+                const checked = document.querySelector('.history-select input[type="radio"]:checked');
+                if (checked && checked.value) {
+                    history.pushState({}, '', '/chat/' + checked.value);
+                }
+            }, 100);
+        }
+    }, true);
+
+    document.addEventListener('change', (e) => {
+        if (e.target && e.target.closest('.history-select')) {
+            const checked = document.querySelector('.history-select input[type="radio"]:checked');
+            if (checked && checked.value) {
+                history.pushState({}, '', '/chat/' + checked.value);
+            }
+        }
+    });
+
+    // 6. New Chat & Delete Chat Buttons URL Sync
+    document.addEventListener('click', (e) => {
+        if (e.target && e.target.closest('.btn-new-chat')) {
+            history.pushState({}, '', '/chat/new');
+        }
+        if (e.target && e.target.closest('.btn-delete-chat')) {
+            history.pushState({}, '', '/chat');
+        }
+    });
+
+    // 7. Browser Autofill Dispatcher for Gradio Inputs
+    document.addEventListener('click', (e) => {
+        if (e.target && (e.target.innerText === 'Sign In' || e.target.innerText === 'Create Account')) {
+            const inputs = document.querySelectorAll('.auth-panel input');
+            inputs.forEach(inp => {
+                inp.dispatchEvent(new Event('input', { bubbles: true }));
+                inp.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        }
+    }, true);
+
+    // 8. Browser Back/Forward Navigation
+    window.addEventListener('popstate', handleRoute);
 }
 """
 
@@ -1021,8 +1235,6 @@ FORCE_LIGHT_JS = """
 def build_ui():
     with gr.Blocks(
         title="AutoBot — AI Automobile Assistant",
-        theme=FORCED_LIGHT_THEME,
-        js=FORCE_LIGHT_JS,
     ) as demo:
 
         # Session States
@@ -1107,19 +1319,20 @@ def build_ui():
                 # ── Left Aligned Sidebar Panel (Recent Chats Layout) ──
                 with gr.Column(scale=1, min_width=240, elem_classes="sidebar-panel"):
                     with gr.Column(elem_classes="sidebar-top-group"):
-                        gr.HTML("<div class='sidebar-title'>Recent Chats</div>")
                         new_chat_btn = gr.Button("+ New Chat", size="sm", elem_classes="btn-new-chat")
+                        delete_history_btn = gr.Button("Delete Selected Chat", size="sm", elem_classes="btn-delete-chat")
                         
-                        history_dropdown = gr.Dropdown(
+                        gr.HTML("<div class='sidebar-title' style='margin-top:6px;'>Recent Chats</div>")
+                        
+                        history_radio = gr.Radio(
                             label="",
                             choices=[],
                             value=None,
                             interactive=True,
-                            allow_custom_value=True,
+                            show_label=False,
                             elem_classes="history-select",
                             container=False,
                         )
-                        delete_history_btn = gr.Button("Delete Selected Chat", size="sm", elem_classes="btn-delete-chat")
                         history_status = gr.HTML("")
 
                         gr.HTML("""
@@ -1146,7 +1359,7 @@ def build_ui():
                             height="calc(100vh - 190px)",
                             elem_classes="chatbot-main",
                             show_label=False,
-                            layout="bubble",
+                            layout="panel",
                             container=False,
                             placeholder="""
 <div style="text-align:center; padding: 18vh 20px 20px 20px;">
@@ -1179,30 +1392,43 @@ def build_ui():
             fn=show_login_form,
             inputs=[],
             outputs=[login_form, signup_form, login_tab_btn, signup_tab_btn],
+            js="() => { history.pushState({}, '', '/login'); }",
         )
 
         signup_tab_btn.click(
             fn=show_signup_form,
             inputs=[],
             outputs=[login_form, signup_form, login_tab_btn, signup_tab_btn],
+            js="() => { history.pushState({}, '', '/signup'); }",
         )
 
         login_btn.click(
             fn=on_login,
             inputs=[login_id_input, login_pw_input],
-            outputs=[user_state, auth_status, auth_view, main_view, history_dropdown, user_badge_md],
+            outputs=[user_state, auth_status, auth_view, main_view, history_radio, user_badge_md],
+        )
+        login_pw_input.submit(
+            fn=on_login,
+            inputs=[login_id_input, login_pw_input],
+            outputs=[user_state, auth_status, auth_view, main_view, history_radio, user_badge_md],
         )
 
         signup_btn.click(
             fn=on_signup,
             inputs=[signup_name_input, signup_email_input, signup_pw_input],
-            outputs=[user_state, auth_status, auth_view, main_view, history_dropdown, user_badge_md],
+            outputs=[user_state, auth_status, auth_view, main_view, history_radio, user_badge_md],
+        )
+        signup_pw_input.submit(
+            fn=on_signup,
+            inputs=[signup_name_input, signup_email_input, signup_pw_input],
+            outputs=[user_state, auth_status, auth_view, main_view, history_radio, user_badge_md],
         )
 
         guest_btn.click(
             fn=on_guest,
             inputs=[],
-            outputs=[user_state, auth_status, auth_view, main_view, history_dropdown, user_badge_md],
+            outputs=[user_state, auth_status, auth_view, main_view, history_radio, user_badge_md],
+            js="() => { history.pushState({}, '', '/chat'); }",
         )
 
         logout_btn.click(
@@ -1210,9 +1436,10 @@ def build_ui():
             inputs=[],
             outputs=[
                 user_state, active_session_id, chatbot, auth_status, auth_view, main_view,
-                history_dropdown, user_badge_md, login_id_input, login_pw_input,
+                history_radio, user_badge_md, login_id_input, login_pw_input,
                 signup_name_input, signup_email_input, signup_pw_input
             ],
+            js="() => { history.pushState({}, '', '/login'); }",
         )
 
         new_chat_btn.click(
@@ -1221,26 +1448,26 @@ def build_ui():
             outputs=[active_session_id, chatbot, history_status],
         )
 
-        history_dropdown.change(
+        history_radio.change(
             fn=on_select_history,
-            inputs=[history_dropdown, user_state],
+            inputs=[history_radio, user_state],
             outputs=[active_session_id, chatbot, history_status],
         )
 
         delete_history_btn.click(
             fn=on_delete_history,
-            inputs=[history_dropdown, user_state],
-            outputs=[active_session_id, chatbot, history_dropdown, history_status],
+            inputs=[history_radio, user_state],
+            outputs=[active_session_id, chatbot, history_radio, history_status],
         )
 
         send_btn.click(
             fn=chat,
             inputs=[msg_input, chatbot, user_state, active_session_id],
-            outputs=[chatbot, msg_input, active_session_id, history_dropdown],
+            outputs=[chatbot, msg_input, active_session_id, history_radio],
         )
         msg_input.submit(
             fn=chat,
             inputs=[msg_input, chatbot, user_state, active_session_id],
-            outputs=[chatbot, msg_input, active_session_id, history_dropdown],
+            outputs=[chatbot, msg_input, active_session_id, history_radio],
         )
     return demo

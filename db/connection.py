@@ -35,6 +35,9 @@ import threading
 from typing import Any, Optional
 from contextlib import contextmanager
 
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
 # Lazy import — only fails if psycopg2-binary not installed
 try:
     import psycopg2
