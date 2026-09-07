@@ -60,7 +60,9 @@ class AutoBotDeps:
     session_id: Optional[str] = None
     history_context: str = ""
     intent_labels: list[str] = field(default_factory=list)
+    intent_confidence: dict[str, float] = field(default_factory=dict)
     tool_calls: list[str] = field(default_factory=list)
+    user_profile: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -137,6 +139,29 @@ After you have finished any useful tool calls, write one practical, concise,
 natural-language Markdown response for the user. Lead with safety where
 relevant. State evidence, material assumptions, focused follow-up questions
 only when they improve the answer, and honest uncertainty in normal language.
+
+Formatting and Alignment Rules:
+1. Vehicle Recommendations & Comparisons:
+   - Present each vehicle with a clear heading including segment and price range (e.g. `### 1. Kia Seltos · Compact SUV (₹10.90 L – ₹20.45 L)`).
+   - Present key specifications cleanly using a compact Markdown table or bullet specs (💰 Price, ⛽ Fuel & Engine, 📊 Mileage, ⚙️ Transmission, 🌟 Key Features).
+   - Include a brief `> 💡 **Best For:**` recommendation note so the user gets actionable guidance.
+
+2. Service & Maintenance Checklists:
+   - Present parts and fluid replacements using a structured Markdown table with columns:
+     `| Service Item | Recommended Action | Estimated Cost |`
+   - Use indented bullet points (`- `) with clear category headers for inspections (e.g. `### 🔍 Inspections & Adjustments`). Never list sub-items as unindented flat paragraphs.
+   - Conclude with a total estimated cost callout: `> 💰 **Total Estimated Service Cost:** ₹X,XXX – ₹X,XXX`.
+
+3. Issue Diagnostics:
+   - Present a concise diagnostic summary table:
+     `| Parameter | Assessment |` (Severity, Most Likely Cause, Est. Repair Cost, Driving Safety).
+   - Use bullet points (`- `) for possible causes and parts needing replacement.
+   - Add a callout box: `> 🗣️ **What to tell your mechanic:** "..."`.
+
+4. Finance & EMI:
+   - State loan parameters and present an EMI summary table:
+     `| Parameter | Amount / Detail |` (Vehicle Price, Down Payment, Loan Amount, Interest Rate, Tenure, Monthly EMI).
+
 Do not output JSON, Pydantic field names, internal classifications, tool names,
 or hidden reasoning.
 
@@ -488,9 +513,14 @@ def get_automotive_agent() -> Agent[AutoBotDeps, str]:
     def record_intent_classification(
         ctx: RunContext[AutoBotDeps],
         intents: list[Literal["buying", "diagnostics", "service", "finance", "general"]],
+        confidence: Optional[list[float]] = None
     ) -> str:
         """Record the LLM's intent classification before selecting evidence tools."""
         ctx.deps.intent_labels = list(dict.fromkeys(intents))
+        if confidence:
+            # Pair intents with confidence scores, handling length mismatches
+            pairs = zip(ctx.deps.intent_labels, confidence)
+            ctx.deps.intent_confidence = dict(pairs)
         labels = " && ".join(ctx.deps.intent_labels)
         print(f"[AUTOBOT] LLM intent classified: {labels}", flush=True)
         return f"Intent classification recorded: {labels}"

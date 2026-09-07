@@ -55,8 +55,8 @@ def on_login(username_or_email: str, password: str):
     if success and user_dict:
         choices = get_history_choices(user_dict)
         radio_update = gr.Radio(choices=choices, value=None, interactive=True)
-        status_html = f"<div style='color:#34d399;font-weight:600;font-size:13px;padding:8px;background:rgba(52,211,153,0.1);border-radius:8px;margin-top:8px;'>✅ {msg}</div>"
-        user_badge = f"<span style='color:#24262d;font-weight:600;'>{user_dict['username']}</span><br/><span style='color:#7b818c;font-size:11px;'>Free plan</span>"
+        status_html = f"<div style='color:#065f46;font-weight:600;font-size:13px;padding:9px 14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;margin-top:10px;'>✅ {msg}</div>"
+        user_badge = f"<div class='user-pill'><span class='user-pill-dot is-online'>●</span> <strong>{user_dict['username']}</strong> <span class='user-pill-tier'>· Free Plan</span></div>"
         return (
             user_dict,                                          # user_state
             status_html,                                        # auth_status
@@ -66,14 +66,14 @@ def on_login(username_or_email: str, password: str):
             user_badge,                                         # user_badge_md
         )
     else:
-        status_html = f"<div style='color:#f87171;font-weight:600;font-size:13px;padding:8px;background:rgba(248,113,113,0.1);border-radius:8px;margin-top:8px;'>❌ {msg}</div>"
+        status_html = f"<div style='color:#b91c1c;font-weight:600;font-size:13px;padding:9px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;margin-top:10px;'>❌ {msg}</div>"
         return (
             None,                                               # user_state
             status_html,                                        # auth_status
             gr.Column(visible=True),                            # auth_view (keep visible)
             gr.Column(visible=False),                           # main_view (keep hidden)
             gr.Radio(choices=[], value=None),                   # history_radio
-            "<span style='color:#24262d;font-weight:600;'>Guest User</span><br/><span style='color:#7b818c;font-size:11px;'>Free plan</span>",
+            "<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong> <span class='user-pill-tier'>· Free Plan</span></div>",
         )
 
 
@@ -83,8 +83,8 @@ def on_signup(username: str, email: str, password: str):
     if success and user_dict:
         choices = get_history_choices(user_dict)
         radio_update = gr.Radio(choices=choices, value=None, interactive=True)
-        status_html = f"<div style='color:#34d399;font-weight:600;font-size:13px;padding:8px;background:rgba(52,211,153,0.1);border-radius:8px;margin-top:8px;'>✅ {msg}</div>"
-        user_badge = f"<span style='color:#e3e3e3;font-weight:600;'>{user_dict['username']}</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>"
+        status_html = f"<div style='color:#065f46;font-weight:600;font-size:13px;padding:9px 14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;margin-top:10px;'>✅ {msg}</div>"
+        user_badge = f"<div class='user-pill'><span class='user-pill-dot is-online'>●</span> <strong>{user_dict['username']}</strong> <span class='user-pill-tier'>· Free Plan</span></div>"
         return (
             user_dict,
             status_html,
@@ -94,14 +94,14 @@ def on_signup(username: str, email: str, password: str):
             user_badge,
         )
     else:
-        status_html = f"<div style='color:#f87171;font-weight:600;font-size:13px;padding:8px;background:rgba(248,113,113,0.1);border-radius:8px;margin-top:8px;'>❌ {msg}</div>"
+        status_html = f"<div style='color:#b91c1c;font-weight:600;font-size:13px;padding:9px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;margin-top:10px;'>❌ {msg}</div>"
         return (
             None,
             status_html,
             gr.Column(visible=True),
             gr.Column(visible=False),
             gr.Radio(choices=[], value=None),
-            "<span style='color:#e3e3e3;font-weight:600;'>Guest User</span><br/><span style='color:#888888;font-size:11px;'>Free plan</span>",
+            "<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong> <span class='user-pill-tier'>· Free Plan</span></div>",
         )
 
 
@@ -113,7 +113,7 @@ def on_guest():
         gr.Column(visible=False),                               # auth_view (hide)
         gr.Column(visible=True),                                # main_view (show)
         gr.Radio(choices=[], value=None, interactive=False),    # history_radio
-        "<span style='color:#24262d;font-weight:600;'>Guest User</span><br/><span style='color:#7b818c;font-size:11px;'>Free plan</span>",
+        "<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong> <span class='user-pill-tier'>· Free Plan</span></div>",
     )
 
 
@@ -123,11 +123,11 @@ def on_logout():
         None,                                                   # user_state = None
         None,                                                   # active_session_id = None
         [],                                                     # chatbot = []
-        "<div style='color:#94a3b8;font-size:13px;padding:8px;'>Signed out successfully.</div>", # auth_status
+        "<div style='color:#475569;font-size:13px;padding:9px 14px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;margin-top:10px;'>Signed out successfully.</div>", # auth_status
         gr.Column(visible=True),                                # auth_view (show)
         gr.Column(visible=False),                               # main_view (hide)
         gr.Radio(choices=[], value=None, interactive=False),    # history_radio
-        "<span style='color:#24262d;font-weight:600;'>Guest User</span><br/><span style='color:#7b818c;font-size:11px;'>Free plan</span>",
+        "<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong> <span class='user-pill-tier'>· Free Plan</span></div>",
         "", "", "", "", ""                                      # clear inputs
     )
 
@@ -168,19 +168,19 @@ def on_select_history(session_id: str, user_state: Optional[dict]) -> Tuple[str,
             formatted_history.append({"role": m["role"], "content": m["content"]})
         return session_id, formatted_history, ""
     except Exception as e:
-        return "", [], f"<div style='color:#f87171;font-size:12px;margin-top:4px;'>Error loading chat: {e}</div>"
+        return "", [], f"<div class='history-status-alert is-error'>Error loading chat: {e}</div>"
 
 
 def on_delete_history(session_id: str, user_state: Optional[dict]) -> Tuple[None, list, gr.Radio, str]:
     """Deletes selected conversation from database and updates history UI."""
     if not session_id or not user_state or "id" not in user_state:
-        return None, [], gr.Radio(choices=[], value=None), "<div style='color:#f87171;font-size:12px;margin-top:4px;'>No chat selected to delete.</div>"
+        return None, [], gr.Radio(choices=[], value=None), "<div class='history-status-alert is-warning'>Select a chat above to delete</div>"
     try:
         db_delete_conversation(session_id, user_state["id"])
         choices = get_history_choices(user_state)
-        return None, [], gr.Radio(choices=choices, value=None), ""
+        return None, [], gr.Radio(choices=choices, value=None), "<div class='history-status-alert is-success'>Chat deleted successfully</div>"
     except Exception as e:
-        return session_id, [], gr.Radio(choices=[], value=None), f"<div style='color:#f87171;font-size:12px;margin-top:4px;'>Error deleting: {e}</div>"
+        return session_id, [], gr.Radio(choices=[], value=None), f"<div class='history-status-alert is-error'>Error deleting: {e}</div>"
 
 
 # ─────────────────────────────────────────────
@@ -271,14 +271,14 @@ async def chat(
 # ─────────────────────────────────────────────
 
 PREMIUM_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body, .gradio-container {
     font-family: 'Inter', -apple-system, sans-serif !important;
-    background: #1b1b1b !important;
-    color: #e3e3e3 !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
     min-height: 100vh;
 }
 
@@ -353,20 +353,21 @@ footer { display: none !important; }
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     margin-bottom: 12px;
     border-radius: 10px;
-    background: rgba(93, 128, 182, 0.12);
-    color: #5d80b6;
-    font-size: 18px;
+    background: rgba(37, 99, 235, 0.08);
+    color: #2563eb;
+    font-size: 20px;
+    border: 1px solid rgba(37, 99, 235, 0.15);
 }
 #auth-card .auth-brand {
-    font-family: 'Instrument Serif', Georgia, serif;
-    font-size: 32px;
-    font-weight: 500;
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 26px;
+    font-weight: 700;
     letter-spacing: -0.5px;
-    line-height: 1.1;
+    line-height: 1.2;
     color: #0f172a;
     margin-bottom: 5px;
 }
@@ -400,9 +401,9 @@ footer { display: none !important; }
     box-shadow: none !important;
 }
 #auth-card button.auth-tab.is-active {
-    background: #eff5ff !important;
-    border-color: #5d80b6 !important;
-    color: #0f172a !important;
+    background: #eff6ff !important;
+    border-color: #2563eb !important;
+    color: #1d4ed8 !important;
     font-weight: 600 !important;
 }
 
@@ -444,8 +445,8 @@ footer { display: none !important; }
     transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
 }
 #auth-card .auth-input .input-container:focus-within {
-    border-color: #5d80b6 !important;
-    box-shadow: 0 0 0 3px rgba(93, 128, 182, 0.15) !important;
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
 }
 #auth-card .auth-input input {
     display: block !important;
@@ -481,16 +482,17 @@ footer { display: none !important; }
     margin-top: 20px !important;
     border: none !important;
     border-radius: 10px !important;
-    background: #5d80b6 !important;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
     color: #ffffff !important;
     font-size: 14px !important;
     font-weight: 600 !important;
-    box-shadow: 0 2px 6px rgba(93, 128, 182, 0.25) !important;
-    transition: background 0.15s ease, box-shadow 0.15s ease !important;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25) !important;
+    transition: all 0.15s ease !important;
 }
 #auth-card .auth-primary:hover {
-    background: #4f71a5 !important;
-    box-shadow: 0 4px 12px rgba(93, 128, 182, 0.35) !important;
+    background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35) !important;
+    transform: translateY(-1px) !important;
 }
 
 /* Status Notification Component (Hidden when empty) */
@@ -542,9 +544,10 @@ footer { display: none !important; }
 }
 #auth-card .auth-promo-copy .auth-mark {
     margin-bottom: 20px;
-    background: rgba(255, 255, 255, 0.12) !important;
-    color: #ffffff !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    color: #60a5fa !important;
     box-shadow: none;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 #auth-card .auth-promo-copy h2 {
     color: #ffffff !important;
@@ -573,142 +576,230 @@ footer { display: none !important; }
     #auth-card .auth-promo-copy h2 { font-size: 24px !important; }
 }
 
-/* ── Main Chat App Shell: Sleek Full-Viewport Crisp White Theme ── */
+/* ── Main Chat App Shell: Modern Slate & Automotive Cobalt Theme ── */
 html, body, #root, .gradio-container {
     width: 100% !important;
     min-width: 0 !important;
-    min-height: 100% !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
     margin: 0 !important;
-    background: #ffffff !important;
-    color: #111827 !important;
+    padding: 0 !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
 }
 
 .gradio-container, .gradio-container > .main, #main-view > .wrap {
     width: 100% !important;
     max-width: none !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
     margin: 0 !important;
     padding: 0 !important;
-    background: #ffffff !important;
+    overflow: hidden !important;
+    background: #f8fafc !important;
 }
 
 #main-view {
-    --color-accent: #5d80b6;
-    --color-accent-soft: rgba(93, 128, 182, 0.12);
-    min-height: 100vh !important;
-    background: #ffffff !important;
-    color: #111827 !important;
+    --color-accent: #2563eb;
+    --color-accent-soft: rgba(37, 99, 235, 0.1);
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
-#main-view > .wrap { padding: 0 !important; }
+#main-view > .wrap {
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+}
 
+/* Header Navigation Bar */
 .top-navbar {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    min-height: 64px !important;
-    padding: 0 28px !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+    padding: 0 24px !important;
     background: #ffffff !important;
-    border-bottom: 2px solid #111827 !important;
-    box-shadow: none !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+    flex-shrink: 0 !important;
+    z-index: 10 !important;
 }
 
+.top-navbar > .wrap {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    padding: 0 !important;
+}
+
+.header-user-controls {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    margin: 0 !important;
+}
+
+.user-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #334155;
+}
+.user-pill-dot {
+    color: #94a3b8;
+    font-size: 10px;
+}
+.user-pill-dot.is-online {
+    color: #10b981;
+}
+.user-pill-tier {
+    color: #64748b;
+}
+
+.btn-logout,
+button.btn-logout {
+    min-height: 32px !important;
+    max-height: 32px !important;
+    height: 32px !important;
+    padding: 0 12px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #64748b !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+.btn-logout:hover {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+}
+
+/* App Workspace (Split View) */
 .app-workspace {
-    min-height: calc(100vh - 64px) !important;
+    flex: 1 1 0% !important;
+    height: calc(100vh - 56px) !important;
+    max-height: calc(100vh - 56px) !important;
     gap: 0 !important;
-    background: #ffffff !important;
+    background: #f8fafc !important;
+    display: flex !important;
+    overflow: hidden !important;
+    min-height: 0 !important;
 }
 
-/* Sidebar */
+.app-workspace > .wrap {
+    display: flex !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Sidebar Panel */
 .sidebar-panel {
-    position: sticky !important;
-    top: 64px !important;
-    height: calc(100vh - 64px) !important;
+    width: 280px !important;
+    min-width: 280px !important;
+    max-width: 280px !important;
+    height: 100% !important;
+    max-height: 100% !important;
     min-height: 0 !important;
-    padding: 24px 20px !important;
-    background: #f9fafb !important;
+    padding: 18px 16px !important;
+    background: #ffffff !important;
     border: 0 !important;
-    border-right: 2px solid #111827 !important;
+    border-right: 1px solid #e2e8f0 !important;
     border-radius: 0 !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    overflow: hidden auto !important;
+    overflow-y: auto !important;
+    flex-shrink: 0 !important;
 }
 
 .sidebar-top-group {
     display: flex !important;
     flex-direction: column !important;
-    gap: 14px !important;
-    flex-grow: 0 !important;
+    gap: 8px !important;
+    flex-grow: 1 !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
 }
 
-.sidebar-top-group > * {
-    margin-bottom: 0 !important;
-    flex-grow: 0 !important;
-}
-
 .sidebar-bottom-group {
     margin-top: auto !important;
-    padding-top: 20px !important;
-    border-top: 1px solid #e5e7eb !important;
+    padding-top: 14px !important;
+    border-top: 1px solid #f1f5f9 !important;
     flex-grow: 0 !important;
+    flex-shrink: 0 !important;
 }
 
-.sidebar-brand {
-    font-family: 'Instrument Serif', Georgia, serif !important;
-    font-size: 24px !important;
-    font-weight: 600 !important;
-    color: #111827 !important;
-    letter-spacing: -0.3px !important;
-    margin-bottom: 12px !important;
-    padding-left: 2px !important;
-}
-
-/* Sidebar Controls */
-.sidebar-panel button,
+/* New Chat Button */
 .btn-new-chat,
 button.btn-new-chat {
-    min-height: 44px !important;
-    max-height: 44px !important;
-    height: 44px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    height: 40px !important;
     padding: 0 16px !important;
-    font-size: 14px !important;
+    font-size: 13.5px !important;
     font-weight: 600 !important;
-    border-radius: 12px !important;
-    box-shadow: none !important;
-    text-align: left !important;
-    background: #ffffff !important;
-    border: 1px solid #d1d5db !important;
-    color: #111827 !important;
-    margin-bottom: 0 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2) !important;
+    text-align: center !important;
+    background: #2563eb !important;
+    border: none !important;
+    color: #ffffff !important;
+    margin-bottom: 8px !important;
     width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
 }
 
-.sidebar-panel button:hover,
 .btn-new-chat:hover {
-    background: #f0f4fa !important;
-    border-color: #5d80b6 !important;
-    color: #5d80b6 !important;
+    background: #1d4ed8 !important;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3) !important;
+    transform: translateY(-1px) !important;
 }
 
-.sidebar-title, h1, h2, h3, h4, h5, h6 {
-    font-size: 15px !important;
+.sidebar-title {
+    font-size: 11.5px !important;
     font-weight: 700 !important;
-    letter-spacing: 0 !important;
-    text-transform: none !important;
-    color: #111827 !important;
-    margin: 0 0 8px 0 !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    color: #94a3b8 !important;
+    margin: 8px 0 6px 2px !important;
 }
 
-/* History List (Claude-style Radio List) */
+/* History List */
 .history-select {
     background: transparent !important;
     border: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
-    max-height: 240px !important;
+    max-height: 180px !important;
     overflow-y: auto !important;
     display: flex !important;
     flex-direction: column !important;
@@ -724,7 +815,6 @@ button.btn-new-chat {
     gap: 4px !important;
 }
 
-/* Hide Radio Dot Circle completely */
 .history-select input[type="radio"] {
     display: none !important;
     appearance: none !important;
@@ -733,20 +823,19 @@ button.btn-new-chat {
     height: 0 !important;
 }
 
-/* Choice Wrapper & Labels */
 .history-select label {
     display: flex !important;
     align-items: center !important;
     width: 100% !important;
-    min-height: 38px !important;
-    max-height: 38px !important;
-    padding: 8px 12px !important;
-    border-radius: 10px !important;
-    font-size: 13px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    padding: 6px 10px !important;
+    border-radius: 8px !important;
+    font-size: 12.5px !important;
     font-weight: 500 !important;
-    color: #374151 !important;
-    background: #ffffff !important;
-    border: 1px solid #e5e7eb !important;
+    color: #334155 !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
     cursor: pointer !important;
     white-space: nowrap !important;
     overflow: hidden !important;
@@ -755,7 +844,6 @@ button.btn-new-chat {
     margin: 0 !important;
 }
 
-/* Text Span inside Label for Ellipsis */
 .history-select label span {
     white-space: nowrap !important;
     overflow: hidden !important;
@@ -764,119 +852,271 @@ button.btn-new-chat {
     display: block !important;
 }
 
-/* Hover State */
 .history-select label:hover {
-    background: #f0f4fa !important;
-    border-color: #5d80b6 !important;
-    color: #5d80b6 !important;
+    background: #eff6ff !important;
+    border-color: #bfdbfe !important;
+    color: #1d4ed8 !important;
 }
 
-/* Selected State */
 .history-select label.selected,
 .history-select label:has(input:checked) {
-    background: rgba(93, 128, 182, 0.12) !important;
-    border-color: #5d80b6 !important;
-    color: #5d80b6 !important;
+    background: #eff6ff !important;
+    border-color: #2563eb !important;
+    color: #1d4ed8 !important;
     font-weight: 600 !important;
 }
 
+.empty-history-box {
+    padding: 10px 8px;
+    font-size: 11.5px;
+    color: #94a3b8;
+    text-align: center;
+    border: 1px dashed #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+    margin: 2px 0 6px 0;
+}
+
+/* Clean Delete Button */
 .btn-delete-chat,
 button.btn-delete-chat {
-    min-height: 42px !important;
-    max-height: 42px !important;
-    height: 42px !important;
-    padding: 0 14px !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    background: #ffffff !important;
-    border: 1px solid #fca5a5 !important;
-    color: #ef4444 !important;
-    border-radius: 12px !important;
-    margin-top: 0 !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    height: 30px !important;
+    padding: 0 10px !important;
+    font-size: 11.5px !important;
+    font-weight: 500 !important;
+    background: transparent !important;
+    border: 1px dashed #cbd5e1 !important;
+    color: #64748b !important;
+    border-radius: 6px !important;
+    margin-top: 2px !important;
     width: 100% !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
 }
 .btn-delete-chat:hover {
     background: #fef2f2 !important;
-    border-color: #dc2626 !important;
+    border-color: #fca5a5 !important;
+    color: #ef4444 !important;
 }
 
-.btn-logout,
-button.btn-logout {
-    min-height: 38px !important;
-    max-height: 38px !important;
-    height: 38px !important;
-    padding: 0 18px !important;
-    font-size: 13px !important;
-    background: #ffffff !important;
-    border: 1px solid #d1d5db !important;
-    color: #374151 !important;
-    border-radius: 10px !important;
+/* History status alert badge */
+.history-status-alert {
+    padding: 6px 10px !important;
+    border-radius: 8px !important;
+    font-size: 11.5px !important;
+    font-weight: 500 !important;
+    text-align: center !important;
+    margin-top: 6px !important;
+    line-height: 1.35 !important;
 }
-.btn-logout:hover {
-    background: #f3f4f6 !important;
-    color: #111827 !important;
+.history-status-alert.is-warning {
+    background: #fffbeb !important;
+    border: 1px solid #fde68a !important;
+    color: #b45309 !important;
+}
+.history-status-alert.is-success {
+    background: #ecfdf5 !important;
+    border: 1px solid #a7f3d0 !important;
+    color: #065f46 !important;
+}
+.history-status-alert.is-error {
+    background: #fef2f2 !important;
+    border: 1px solid #fecaca !important;
+    color: #b91c1c !important;
 }
 
-/* Main Chat Area */
+/* Interactive Prompt Starter Chips */
+.feature-list {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.prompt-chip,
+button.prompt-chip {
+    width: 100% !important;
+    min-height: 32px !important;
+    height: auto !important;
+    padding: 6px 10px !important;
+    font-size: 11.5px !important;
+    font-weight: 500 !important;
+    color: #475569 !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    margin-bottom: 5px !important;
+    text-align: left !important;
+    cursor: pointer !important;
+    line-height: 1.35 !important;
+    transition: all 0.15s ease !important;
+    box-shadow: none !important;
+}
+
+.prompt-chip:hover {
+    background: #eff6ff !important;
+    border-color: #93c5fd !important;
+    color: #1d4ed8 !important;
+    transform: translateX(2px) !important;
+}
+
+.sync-note {
+    color: #94a3b8 !important;
+    font-size: 11px;
+    line-height: 1.35;
+    text-align: center;
+}
+
+/* ── Main Chat Area (Flex Viewport Locked) ── */
 .main-chat-area {
-    min-height: calc(100vh - 64px) !important;
-    padding: 20px clamp(24px, 5vw, 72px) 22px !important;
-    background: #ffffff !important;
+    flex: 1 1 0% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    padding: 16px 28px 12px 28px !important;
+    background: #f8fafc !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
 }
 
 .main-chat-area > .wrap {
-    max-width: 1080px !important;
+    max-width: 1040px !important;
+    width: 100% !important;
     height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
     margin: 0 auto !important;
     padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
 }
 
 .chat-shell {
-    min-height: calc(100vh - 104px) !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
     background: transparent !important;
     border: 0 !important;
     display: flex !important;
     flex-direction: column !important;
-    justify-content: space-between !important;
+    overflow: hidden !important;
+    gap: 8px !important;
 }
 
-/* Chatbot Outer Container (Single Clean Boundary) */
-.chatbot-main {
+.chat-shell > .wrap {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
     overflow: hidden !important;
-    border: 2px solid #111827 !important;
+}
+
+/* Chatbot Outer Container (Flex fills remaining vertical space) */
+.chatbot-main {
+    flex: 1 1 auto !important;
+    flex-grow: 1 !important;
+    flex-shrink: 1 !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    border: 1px solid #e2e8f0 !important;
     border-radius: 16px !important;
     background: #ffffff !important;
-    box-shadow: none !important;
-    flex: 1 1 auto !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 16px rgba(15, 23, 42, 0.04) !important;
+    margin-bottom: 2px !important;
+}
+
+.chatbot-main,
+.chatbot-main .panel,
+.chatbot-main .message-row,
+.chatbot-main .message-wrap,
+.chatbot-main [data-testid="chatbot"],
+.chatbot-main > .wrap {
+    background: #ffffff !important;
 }
 
 .chatbot-main > .wrap {
-    background: #ffffff !important;
-    padding: 24px 28px !important;
+    padding: 20px 24px 60px 24px !important;
     border: 0 !important;
     box-shadow: none !important;
     display: flex !important;
     flex-direction: column !important;
     overflow-y: auto !important;
     height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    scroll-padding-bottom: 60px !important;
 }
 
-/* Explicit Reset for Inner Gradio Containers & Guaranteed Vertical Flow */
-.chatbot-main .wrap,
-.chatbot-main .message-wrap,
-.chatbot-main .message-row,
-.chatbot-main .bubble-wrap,
-.chatbot-main .avatar-container,
-.chatbot-main .avatar {
-    border: 0 !important;
-    box-shadow: none !important;
-    background: transparent !important;
+/* Ensure the last message always has ample clearance from bottom edge */
+.chatbot-main .message-row:last-child {
+    margin-bottom: 36px !important;
+    padding-bottom: 16px !important;
 }
 
+/* Suppress ugly Gradio autoscroll indicator and message action icons */
+.chatbot-main button.scroll-down,
+.chatbot-main .scroll-down,
+.chatbot-main .scroll-hide,
+.chatbot-main button[aria-label*="down"],
+.chatbot-main button[aria-label*="Scroll"],
+.chatbot-main button[aria-label*="Copy"],
+.chatbot-main button[title*="Copy"],
+.chatbot-main button[aria-label*="Share"],
+.chatbot-main button[title*="Share"],
+.chatbot-main .message-buttons,
+.chatbot-main .message-actions,
+.chatbot-main button.icon-button,
+.chatbot-main [data-testid="copy-button"],
+.chatbot-main [data-testid="share-button"],
+.chatbot-main [aria-label*="delete"] {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Welcome empty state */
+.chat-empty-state {
+    text-align: center;
+    padding: clamp(30px, 10vh, 100px) 20px 20px 20px;
+    max-width: 580px;
+    margin: 0 auto;
+}
+.chat-empty-icon {
+    font-size: 32px;
+    color: #2563eb;
+    margin-bottom: 12px;
+}
+.chat-empty-title {
+    font-size: 26px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    letter-spacing: -0.5px !important;
+    line-height: 1.25 !important;
+    margin-bottom: 8px !important;
+}
+.chat-empty-subtitle {
+    font-size: 14px !important;
+    color: #64748b !important;
+    line-height: 1.5 !important;
+}
+
+/* Message Bubbles */
 .chatbot-main .message-wrap {
     display: flex !important;
     flex-direction: column !important;
-    gap: 16px !important;
+    gap: 12px !important;
     width: 100% !important;
 }
 
@@ -885,160 +1125,289 @@ button.btn-logout {
     flex-direction: column !important;
     width: 100% !important;
     clear: both !important;
-    margin-bottom: 20px !important;
+    margin-bottom: 14px !important;
 }
 
-/* Hide Avatar Column & Gap */
-.chatbot-main .avatar-container,
-.chatbot-main .avatar {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: 0 !important;
+/* User Message: High Specificity Pure White Text on Dark Slate */
+.message.user,
+.message.user *,
+.message.user p,
+.message.user span,
+.message.user div,
+.message.user strong,
+.message.user em {
+    color: #ffffff !important;
 }
 
-.chatbot-main,
-.chatbot-main *:not(button):not(svg):not(path) {
-    color: #111827 !important;
-}
-
-.chatbot-main button[aria-label*="Copy"],
-.chatbot-main button[title*="Copy"],
-.chatbot-main button[aria-label*="Share"],
-.chatbot-main button[title*="Share"],
-.chatbot-main .message-buttons,
-.chatbot-main .message-actions {
-    display: none !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-}
-
-/* Floating Input Bar (Matching 16px Radius) */
-.floating-input-bar {
-    width: 100% !important;
-    max-width: 1080px !important;
-    background: #f9fafb !important;
-    border: 2px solid #111827 !important;
-    border-radius: 16px !important;
-    padding: 8px 12px 8px 20px !important;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05) !important;
-    margin: 18px auto 0 !important;
-}
-
-.floating-input-bar > .wrap {
-    padding: 0 !important;
-}
-.floating-input-bar > .wrap > .row {
-    align-items: center !important;
-    gap: 10px !important;
-}
-.floating-input-bar .block { min-width: 0 !important; }
-
-.floating-input-bar textarea {
-    background: transparent !important;
-    border: none !important;
-    color: #111827 !important;
-    font-size: 15px !important;
-    font-family: 'Inter', sans-serif !important;
-    padding: 14px 16px !important;
-    resize: none !important;
-    caret-color: #5d80b6 !important;
-}
-.floating-input-bar textarea::placeholder { color: #6b7280 !important; }
-
-/* Action Send Button */
-.send-button,
-button.send-button {
-    background: linear-gradient(135deg, #5d80b6, #30476b) !important;
-    border: none !important;
-    border-radius: 12px !important;
-    color: white !important;
-    font-weight: 600 !important;
-    font-size: 14px !important;
-    padding: 0 22px !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    min-height: 48px !important;
-    max-height: 48px !important;
-    box-shadow: 0 4px 14px rgba(93, 128, 182, 0.3) !important;
-}
-.send-button:hover {
-    background: linear-gradient(135deg, #7397cf, #4f71a5) !important;
-    transform: translateY(-1px) !important;
-}
-
-/* Chatbot Message Bubbles: User on Right, Bot on Left (Sequential, Never Overlapping) */
 .message.user {
     display: block !important;
-    background: #f3f4f6 !important;
-    color: #111827 !important;
-    border: 1px solid #e5e7eb !important;
-    border-radius: 14px !important;
-    padding: 12px 18px !important;
+    background: linear-gradient(135deg, #1e293b, #0f172a) !important;
+    border: 1px solid #334155 !important;
+    border-radius: 16px 16px 4px 16px !important;
+    padding: 10px 18px !important;
     width: fit-content !important;
-    max-width: min(700px, 80%) !important;
+    max-width: min(640px, 80%) !important;
     margin-left: auto !important;
     margin-right: 0 !important;
-    margin-bottom: 16px !important;
-    font-size: 15px !important;
+    margin-bottom: 12px !important;
+    font-size: 14.5px !important;
+    line-height: 1.5 !important;
     box-sizing: border-box !important;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1) !important;
     clear: both !important;
 }
+
+/* Bot Message: Structured Automotive Presentation with Clean Alignment */
 .message.bot {
     display: block !important;
     background: transparent !important;
     border: 0 !important;
-    color: #111827 !important;
-    padding: 4px 0 16px 0 !important;
+    color: #0f172a !important;
+    padding: 8px 16px 20px 16px !important;
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: 920px !important;
     margin-right: auto !important;
     margin-left: 0 !important;
-    font-size: 15px !important;
-    line-height: 1.75 !important;
+    font-size: 14.5px !important;
+    line-height: 1.7 !important;
     clear: both !important;
+}
+
+.message.bot p {
+    margin-bottom: 12px !important;
+    line-height: 1.65 !important;
+}
+
+.message.bot h3 {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    margin: 20px 0 10px 0 !important;
+    padding-bottom: 6px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+
+.message.bot h4 {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: #1e293b !important;
+    margin: 16px 0 8px 0 !important;
+}
+
+/* Clear List Indentation & Hierarchical Bullet Spacing */
+.message.bot ul,
+.message.bot ol {
+    padding-left: 26px !important;
+    margin: 10px 0 16px 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+}
+
+.message.bot li {
+    color: #1e293b !important;
+    font-size: 14px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 4px !important;
+}
+
+.message.bot li > ul,
+.message.bot li > ol {
+    padding-left: 20px !important;
+    margin: 6px 0 8px 0 !important;
+}
+
+.message.bot hr {
+    border: none !important;
+    border-top: 1px solid #e2e8f0 !important;
+    margin: 18px 0 !important;
+    width: 100% !important;
+}
+
+/* Automotive Specs & Maintenance Markdown Tables */
+.message.bot table {
+    width: 100% !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    margin: 12px 0 18px 0 !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+}
+
+.message.bot th {
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    padding: 10px 14px !important;
+    text-align: left !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.message.bot td {
+    padding: 10px 14px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    color: #1e293b !important;
+    font-size: 13.5px !important;
+    line-height: 1.5 !important;
+}
+
+.message.bot tr:nth-child(even) td {
+    background: #f8fafc !important;
+}
+
+.message.bot tr:last-child td {
+    border-bottom: none !important;
+}
+
+.message.bot code {
+    background: #eff6ff !important;
+    color: #1d4ed8 !important;
+    padding: 2px 7px !important;
+    border-radius: 6px !important;
+    font-size: 12.5px !important;
+    border: 1px solid #dbeafe !important;
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+.message.bot blockquote {
+    border-left: 3px solid #2563eb !important;
+    background: #f8fafc !important;
+    padding: 10px 14px !important;
+    margin: 14px 0 !important;
+    border-radius: 0 8px 8px 0 !important;
+    color: #334155 !important;
+}
+
+/* Docked Floating Input Bar (Sleek Elevated Capsule, No Collision) */
+.floating-input-bar {
+    flex: 0 0 auto !important;
+    flex-grow: 0 !important;
+    flex-shrink: 0 !important;
+    height: auto !important;
+    min-height: 52px !important;
+    max-height: 58px !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 14px !important;
+    padding: 4px 6px 4px 14px !important;
+    box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.08) !important;
+    margin: 10px auto 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+.floating-input-bar:focus-within {
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15), 0 4px 16px -2px rgba(15, 23, 42, 0.1) !important;
+}
+
+.floating-input-bar > .wrap {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex-grow: 0 !important;
+    padding: 0 !important;
+    gap: 8px !important;
+}
+
+/* Eliminate Inner Double-Border: Strip all inner borders and backgrounds from Gradio's textbox elements */
+.floating-input-bar .gradio-textbox,
+.floating-input-bar [data-testid="textbox"],
+.floating-input-bar .block,
+.floating-input-bar .wrap,
+.floating-input-bar .input-container,
+.floating-input-bar .container,
+.floating-input-bar fieldset,
+.floating-input-bar label {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.floating-input-bar .input-container:focus-within {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.floating-input-bar textarea {
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    color: #0f172a !important;
+    font-size: 14px !important;
+    font-family: 'Inter', sans-serif !important;
+    padding: 8px 10px !important;
+    resize: none !important;
+    caret-color: #2563eb !important;
+    line-height: 1.4 !important;
+}
+.floating-input-bar textarea:focus {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+.floating-input-bar textarea::placeholder { color: #94a3b8 !important; }
+
+.send-button,
+button.send-button {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+    border: none !important;
+    border-radius: 10px !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 13.5px !important;
+    padding: 0 20px !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    height: 40px !important;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25) !important;
+    flex-shrink: 0 !important;
+}
+.send-button:hover {
+    background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35) !important;
 }
 
 /* Disclaimer text */
 .disclaimer-text {
+    flex-shrink: 0 !important;
     text-align: center;
-    font-size: 12px;
-    color: #6b7280;
-    margin-top: 12px;
-}
-
-.feature-list {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid #e5e7eb;
-}
-.feature-item {
-    display: flex;
-    align-items: center;
-    min-height: 28px;
-    color: #4b5563 !important;
-    font-size: 13px;
-}
-.sync-note {
-    color: #6b7280 !important;
-    font-size: 12px;
-    line-height: 1.4;
+    font-size: 11px;
+    color: #94a3b8;
+    margin: 6px 0 0 0;
+    line-height: 1.2;
 }
 
 @media (max-width: 900px) {
     .app-workspace { flex-direction: column !important; }
     .sidebar-panel {
-        position: relative !important;
-        top: auto !important;
         width: 100% !important;
+        max-width: 100% !important;
         height: auto !important;
+        max-height: 220px !important;
         border-right: 0 !important;
-        border-bottom: 2px solid #111827 !important;
+        border-bottom: 1px solid #e2e8f0 !important;
     }
-    .main-chat-area { padding: 16px !important; }
-    .chatbot-main { border-radius: 16px !important; }
+    .main-chat-area { padding: 12px 14px !important; }
     .message.user,
     .message.bot { max-width: 94% !important; }
 }
@@ -1046,7 +1415,8 @@ button.send-button {
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 """
 
 
@@ -1055,30 +1425,25 @@ button.send-button {
 # ─────────────────────────────────────────────
 
 # ─────────────────────────────────────────────
-# Force-light theme: Gradio's Default() theme carries separate
-# "_dark" variants for every color variable and auto-activates them
-# when the OS/browser prefers dark mode. Overriding classes in CSS
-# alone can't reach that — the components read the theme variables
-# directly. So we pin every *_dark variable to the same light value
-# used by the CSS above, eliminating the dark variant entirely.
+# Force-light theme
 # ─────────────────────────────────────────────
 FORCED_LIGHT_THEME = gr.themes.Default().set(
-    body_background_fill="#ffffff",
-    body_background_fill_dark="#ffffff",
+    body_background_fill="#f8fafc",
+    body_background_fill_dark="#f8fafc",
     background_fill_primary="#ffffff",
     background_fill_primary_dark="#ffffff",
-    background_fill_secondary="#f9fafb",
-    background_fill_secondary_dark="#f9fafb",
+    background_fill_secondary="#f1f5f9",
+    background_fill_secondary_dark="#f1f5f9",
     block_background_fill="#ffffff",
     block_background_fill_dark="#ffffff",
-    body_text_color="#111827",
-    body_text_color_dark="#111827",
-    block_label_text_color="#111827",
-    block_label_text_color_dark="#111827",
+    body_text_color="#0f172a",
+    body_text_color_dark="#0f172a",
+    block_label_text_color="#0f172a",
+    block_label_text_color_dark="#0f172a",
     input_background_fill="#ffffff",
     input_background_fill_dark="#ffffff",
-    border_color_primary="#e5e7eb",
-    border_color_primary_dark="#e5e7eb",
+    border_color_primary="#e2e8f0",
+    border_color_primary_dark="#e2e8f0",
 )
 
 # Belt-and-suspenders: also strip any 'dark' class Gradio adds to
@@ -1251,7 +1616,7 @@ def build_ui():
                         with gr.Column(elem_classes="auth-form-inner"):
                             gr.HTML("""
                             <div class="auth-form-heading">
-                                <div class="auth-mark">✴️</div>
+                                <div class="auth-mark">✦</div>
                                 <div class="auth-brand">AutoBot</div>
                                 <p>Your AI Automobile Assistant.</p>
                             </div>
@@ -1291,7 +1656,7 @@ def build_ui():
                     with gr.Column(scale=1, min_width=360, elem_classes="auth-promo-pane"):
                         gr.HTML("""
                         <div class="auth-promo-copy">
-                            <div class="auth-mark">✴️</div>
+                            <div class="auth-mark">✦</div>
                             <h2>AutoBot</h2>
                             <p>Sign in or create an account to save your chat sessions and diagnostic reports.</p>
                         </div>
@@ -1305,24 +1670,25 @@ def build_ui():
             # Top Sticky Header Navigation Bar
             with gr.Row(elem_classes="top-navbar"):
                 gr.HTML("""
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="font-family:'Instrument Serif', Georgia, serif;font-size:24px;color:#111827;font-weight:600;"><span style="color:#5d80b6;">✦</span> AutoBot</span>
-                    <span style="font-size:12px;color:#6b7280;font-weight:500;">AI Automobile Assistant</span>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span style="font-size:18px;font-weight:700;color:#0f172a;letter-spacing:-0.4px;display:flex;align-items:center;gap:7px;">
+                        <span style="color:#2563eb;font-size:20px;">✦</span> AutoBot
+                    </span>
+                    <span style="font-size:12px;color:#64748b;font-weight:500;padding-left:12px;border-left:1px solid #e2e8f0;">Automotive AI Intelligence</span>
                 </div>
                 """)
-                with gr.Row():
-                    user_badge_md = gr.HTML("<span style='color:#111827;font-weight:700;'>Guest User</span>")
+                with gr.Row(elem_classes="header-user-controls"):
+                    user_badge_md = gr.HTML("<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong> <span class='user-pill-tier'>· Free Plan</span></div>")
                     logout_btn = gr.Button("Sign Out", size="sm", elem_classes="btn-logout")
 
             with gr.Row(elem_classes="app-workspace"):
 
-                # ── Left Aligned Sidebar Panel (Recent Chats Layout) ──
+                # ── Left Aligned Sidebar Panel (Recent Chats & Prompt Starters) ──
                 with gr.Column(scale=1, min_width=240, elem_classes="sidebar-panel"):
                     with gr.Column(elem_classes="sidebar-top-group"):
                         new_chat_btn = gr.Button("+ New Chat", size="sm", elem_classes="btn-new-chat")
-                        delete_history_btn = gr.Button("Delete Selected Chat", size="sm", elem_classes="btn-delete-chat")
                         
-                        gr.HTML("<div class='sidebar-title' style='margin-top:6px;'>Recent Chats</div>")
+                        gr.HTML("<div class='sidebar-title'>Recent Chats</div>")
                         
                         history_radio = gr.Radio(
                             label="",
@@ -1333,19 +1699,19 @@ def build_ui():
                             elem_classes="history-select",
                             container=False,
                         )
+                        empty_history_box = gr.HTML("<div class='empty-history-box'>No saved chats yet</div>")
+                        delete_history_btn = gr.Button("🗑️ Delete Selected", size="sm", elem_classes="btn-delete-chat")
                         history_status = gr.HTML("")
 
                         gr.HTML("""
                         <div class="feature-list">
-                            <div class="sidebar-title">Capabilities</div>
-                            <div style="display:flex;flex-direction:column;gap:4px;">
-                                <div class="feature-item">Car buying and comparison</div>
-                                <div class="feature-item">Issue diagnostics and repair</div>
-                                <div class="feature-item">Milestone service planning</div>
-                                <div class="feature-item">Loan and EMI calculation</div>
-                            </div>
+                            <div class="sidebar-title">Prompt Starters</div>
                         </div>
                         """)
+                        prompt_btn_1 = gr.Button("🚗 Best SUVs under ₹15L", size="sm", elem_classes="prompt-chip")
+                        prompt_btn_2 = gr.Button("🔧 Squeaking brake check", size="sm", elem_classes="prompt-chip")
+                        prompt_btn_3 = gr.Button("📅 30,000 km maintenance", size="sm", elem_classes="prompt-chip")
+                        prompt_btn_4 = gr.Button("💰 EMI for ₹10L car loan", size="sm", elem_classes="prompt-chip")
 
                     # Bottom User Profile Footer Card
                     with gr.Column(elem_classes="sidebar-bottom-group"):
@@ -1356,36 +1722,31 @@ def build_ui():
                     with gr.Column(elem_classes="chat-shell"):
                         chatbot = gr.Chatbot(
                             value=[],
-                            height="calc(100vh - 190px)",
                             elem_classes="chatbot-main",
                             show_label=False,
                             layout="panel",
                             container=False,
                             placeholder="""
-<div style="text-align:center; padding: 18vh 20px 20px 20px;">
-    <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 42px; font-weight: 400; color: #111827; letter-spacing: -0.5px; line-height: 1.2;">
-        <span style="color: #5d80b6; margin-right: 8px;">✦</span> Good day,
-    </div>
-    <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 40px; font-weight: 400; color: #374151; margin-top: 6px;">
-        What would you like to explore today?
-    </div>
+<div class="chat-empty-state">
+    <div class="chat-empty-icon">✦</div>
+    <h2 class="chat-empty-title">Welcome to AutoBot</h2>
+    <p class="chat-empty-subtitle">Your intelligent automobile companion for car buying, diagnostics, maintenance, and finance.</p>
 </div>
 """,
                         )
 
-                        with gr.Column(elem_classes="floating-input-bar"):
-                            with gr.Row():
-                                msg_input = gr.Textbox(
-                                    placeholder="Ask anything about cars",
-                                    show_label=False,
-                                    lines=1,
-                                    max_lines=4,
-                                    container=False,
-                                    scale=7,
-                                )
-                                send_btn = gr.Button("Send", variant="primary", elem_classes="send-button", scale=1)
+                        with gr.Row(elem_classes="floating-input-bar"):
+                            msg_input = gr.Textbox(
+                                placeholder="Ask anything about cars (e.g. Compare SUVs under ₹15L, diagnose engine sounds...)",
+                                show_label=False,
+                                lines=1,
+                                max_lines=4,
+                                container=False,
+                                scale=8,
+                            )
+                            send_btn = gr.Button("Send", variant="primary", elem_classes="send-button", scale=1)
 
-                        gr.HTML("<div class='disclaimer-text'>Responses may be inaccurate. Be sure to verify important details</div>")
+                        gr.HTML("<div class='disclaimer-text'>AutoBot provides AI assistance. Verify critical safety and on-road pricing with authorized dealerships.</div>")
 
         # ── Event Wire Up ───────────────────────────
         login_tab_btn.click(
@@ -1458,6 +1819,23 @@ def build_ui():
             fn=on_delete_history,
             inputs=[history_radio, user_state],
             outputs=[active_session_id, chatbot, history_radio, history_status],
+        )
+
+        prompt_btn_1.click(
+            fn=lambda: "Give me the latest verified SUV options under 15 Lakhs in India with price and key specs",
+            outputs=[msg_input],
+        )
+        prompt_btn_2.click(
+            fn=lambda: "Why are my car brakes making a squeaking noise when stopping? Is it safe to drive?",
+            outputs=[msg_input],
+        )
+        prompt_btn_3.click(
+            fn=lambda: "What is the recommended 30,000 km milestone service checklist and estimated cost?",
+            outputs=[msg_input],
+        )
+        prompt_btn_4.click(
+            fn=lambda: "Calculate monthly EMI for a 10 Lakh car loan at 9% interest for 5 years with 2 Lakh down payment",
+            outputs=[msg_input],
         )
 
         send_btn.click(
