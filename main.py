@@ -6,7 +6,6 @@ Architecture:
     main.py           ← launch entry point
     ui/
         app.py        ← Gradio UI layout & event wiring
-        formatters.py ← GFM markdown response formatters
     agents/
         automotive_agent.py ← Single LLM-Led Pydantic AI Automotive Agent
     models/

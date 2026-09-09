@@ -58,12 +58,15 @@ AutoBot is an intelligent, full-stack automobile assistant tailored for the **In
 
 ```text
 Auto-Bot/
-├── main.py                     # Gradio entrypoint — launches UI on port 7860
-├── api_server.py               # FastAPI entrypoint — launches REST API on port 8000
+├── main.py                     # Primary Application Entrypoint (UI on :7860 + SPA redirect)
+├── api_server.py               # Standalone FastAPI REST & SSE Server (optional on :8000)
 ├── run_all.py                  # Dev convenience — starts both servers from one command
-├── docker-compose.yml          # Docker Compose — PostgreSQL service for local dev
-├── requirements.txt            # Python dependencies
+├── Dockerfile                  # Production Docker container definition
+├── docker-compose.yml          # Full-stack Docker Compose (PostgreSQL + AutoBot App)
+├── .dockerignore               # Docker build exclusions
+├── requirements.txt            # Production Python dependencies
 ├── .env.example                # Environment variable template
+├── .gitignore                  # Git ignore definitions
 │
 ├── api/                        # ── FastAPI Layer ────────────────────────────────────
 │   ├── app.py                  # FastAPI app factory, CORS, startup warm-up, routers
@@ -77,27 +80,30 @@ Auto-Bot/
 │       └── sessions.py         # GET /sessions/{session_id}/history
 │
 ├── agents/
-│   └── automotive_agent.py     # Pydantic AI Agent, system prompt, 9 tools
+│   └── automotive_agent.py     # Pydantic AI Agent, system prompt, safe tools
 │
 ├── tools/
 │   └── car_tools.py            # DB query helpers & EMI math
 │
 ├── db/
-│   ├── connection.py           # ThreadedConnectionPool (min=2, max=10) & TTLCache
+│   ├── connection.py           # ThreadedConnectionPool & TTLCache
 │   ├── queries.py              # Parameterised SQL queries
 │   ├── fuzzy_queries.py        # RapidFuzz fuzzy search engine
 │   ├── auth.py                 # PBKDF2 password hashing & user auth
 │   └── migrate.py              # DDL schema migration & seed data loader
 │
 ├── models/
-│   └── schemas.py              # Pydantic domain models
+│   └── schemas.py              # Pydantic domain models (FuzzyCarFilter, QueryPlan)
 │
 ├── ui/
-│   ├── app.py                  # Gradio SPA UI
-│   └── formatters.py           # Markdown formatters
+│   └── app.py                  # Gradio SPA UI & Design System CSS
 │
-└── data/
-    └── seed.json               # Seed data for PostgreSQL
+├── data/
+│   └── seed.json               # Seed data for PostgreSQL
+│
+└── scripts/
+    ├── docker-entrypoint.sh    # Container entrypoint (auto-migration & app runner)
+    └── smoke_test.sh           # API smoke test suite
 ```
 
 ---
