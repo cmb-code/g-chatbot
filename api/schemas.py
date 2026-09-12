@@ -91,7 +91,7 @@ class HealthResponse(BaseModel):
     status: str = Field(..., description="'ok' or 'degraded'")
     db: str = Field(..., description="'connected' or error message")
     agent: str = Field(..., description="'ready' or 'not_initialised'")
-    model: str = Field(default="gemini-2.5-flash")
+    model: str = Field(default="gemini-3.6-flash")
 
 
 # ─────────────────────────────────────────────

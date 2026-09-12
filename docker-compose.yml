@@ -45,7 +45,7 @@ services:
       # Connects directly to the 'db' container over the Docker network
       DATABASE_URL: postgresql://autobot:autobot123@db:5432/autobot_db
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
       API_HOST: 0.0.0.0
       API_PORT: 8000
     ports:

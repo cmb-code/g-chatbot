@@ -142,9 +142,15 @@ only when they improve the answer, and honest uncertainty in normal language.
 
 Formatting and Alignment Rules:
 1. Vehicle Recommendations & Comparisons:
-   - Present each vehicle with a clear heading including segment and price range (e.g. `### 1. Kia Seltos · Compact SUV (₹10.90 L – ₹20.45 L)`).
-   - Present key specifications cleanly using a compact Markdown table or bullet specs (💰 Price, ⛽ Fuel & Engine, 📊 Mileage, ⚙️ Transmission, 🌟 Key Features).
-   - Include a brief `> 💡 **Best For:**` recommendation note so the user gets actionable guidance.
+   - Present each recommended or compared vehicle using the structured Card layout format:
+     ### [Number]. [Vehicle Name] · [Segment] ([Price Range])
+     * 💰 **Price:** [Ex-Showroom Price Range]
+     * ⛽ **Fuel & Engine:** [Engine capacity / Fuel type / Battery]
+     * 📊 **Mileage / Range:** [ARAI Mileage km/l or Range km]
+     * ⚙️ **Transmission:** [Manual / Automatic / AMT]
+     * 🌟 **Key Features:** [Feature 1, Feature 2, Feature 3, ...]
+     > 💡 **Best For:** [Concise target persona or usage scenario]
+   - Ensure every car recommended follows this consistent structure so it renders into an interactive automotive card view.
 
 2. Service & Maintenance Checklists:
    - Present parts and fluid replacements using a structured Markdown table with columns:
@@ -684,10 +690,11 @@ async def stream_chat_with_autobot(
 
     except Exception as exc:
         print(f"[AUTOBOT] ERROR: {type(exc).__name__}: {exc}", flush=True)
-        if "429" in str(exc) or "quota" in str(exc).lower() or "RESOURCE_EXHAUSTED" in str(exc):
+        err_str = str(exc).lower()
+        if "429" in str(exc) or "quota" in err_str or "resource_exhausted" in err_str:
             quota_msg = (
                 "⚠️ **Gemini API Rate Limit / Daily Quota Reached**\n\n"
-                "The free-tier Gemini API request limit (`20 requests/day` for gemini-2.5-flash) has been temporarily exhausted.\n\n"
+                "The free-tier Gemini API request limit (`20 requests/day` for gemini-3.6-flash) has been temporarily exhausted.\n\n"
                 "**How to fix:**\n"
                 "1. Please wait **20 to 60 seconds** and try your request again.\n"
                 "2. Or add a fresh `GEMINI_API_KEY` in your `.env` file.\n"
@@ -695,6 +702,22 @@ async def stream_chat_with_autobot(
             yield AutoBotStreamUpdate(
                 content=quota_msg,
                 intents=tuple(deps.intent_labels) if deps.intent_labels else ("rate_limit",),
+                tool_calls=tuple(deps.tool_calls),
+                complete=True,
+                elapsed_seconds=round(time.monotonic() - started, 2),
+                cached_tokens=0,
+            )
+            return
+        elif "503" in str(exc) or "unavailable" in err_str or "high demand" in err_str:
+            busy_msg = (
+                "⚠️ **Gemini Service Temporarily Busy (503)**\n\n"
+                "Google's Gemini service is currently experiencing a temporary surge in demand.\n\n"
+                "**How to fix:**\n"
+                "Please wait **10 to 15 seconds** and submit your prompt again."
+            )
+            yield AutoBotStreamUpdate(
+                content=busy_msg,
+                intents=tuple(deps.intent_labels) if deps.intent_labels else ("service_busy",),
                 tool_calls=tuple(deps.tool_calls),
                 complete=True,
                 elapsed_seconds=round(time.monotonic() - started, 2),

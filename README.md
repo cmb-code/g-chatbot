@@ -32,7 +32,7 @@ AutoBot is an intelligent, full-stack automobile assistant tailored for the **In
                                    ▼
                       ┌────────────────────────┐
                       │   Pydantic AI Agent    │
-                      │   (Gemini 2.5 Flash)   │
+                      │   (Gemini 3.6 Flash)   │
                       └────────────┬───────────┘
                                    │ LLM-selected tools
                                    ▼

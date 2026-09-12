@@ -156,7 +156,7 @@ def create_app() -> FastAPI:
         )
 
         overall = "ok" if (db_ok and agent_ok) else "degraded"
-        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+        model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
         return JSONResponse(
             status_code=200 if overall == "ok" else 503,

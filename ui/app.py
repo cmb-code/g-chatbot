@@ -10,6 +10,7 @@ Layout Specifications Replicated from Architecture:
 """
 
 import os
+import re
 import uuid
 from collections.abc import AsyncIterator
 from typing import Optional, Tuple
@@ -25,6 +26,106 @@ from db.queries import (
     db_get_conversation_messages,
     db_delete_conversation,
 )
+
+
+# ─────────────────────────────────────────────
+# Helper Functions: Car Recommendation Card Formatter
+# ─────────────────────────────────────────────
+
+def format_car_recommendation_cards(text: str) -> str:
+    """Converts structured vehicle recommendation sections into modern HTML car cards."""
+    if not text or "<div class=\"car-card\"" in text or "<div class='car-card'" in text:
+        return text
+
+    pattern = re.compile(
+        r"###\s+(?:(?:\d+\.|\*|\-)\s+)?([^\n·\(\)]+?)(?:\s+[·\-–]\s+([^\n\(\)]+?))?(?:\s*\(([^\n\)]+?)\))?\n\n?"
+        r"((?:[\*\-]\s+[^\n]+\n?)+)"
+        r"(?:\n*>+\s*(?:💡\s*)?\*\*Best For:\*\*\s*([^\n]+))?",
+        re.MULTILINE
+    )
+
+    def replace_with_card(match):
+        name = match.group(1).strip()
+        segment = (match.group(2) or "").strip()
+        price_header = (match.group(3) or "").strip()
+        specs_raw = match.group(4).strip()
+        best_for = (match.group(5) or "").strip()
+
+        spec_items = []
+        features = []
+        price = price_header
+
+        for line in specs_raw.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            line = re.sub(r"^[\*\-]\s*", "", line)
+
+            if ("Price:" in line or "💰" in line) and not price:
+                p_match = re.search(r"Price:\*\*\s*(.+)$", line, re.IGNORECASE)
+                if p_match:
+                    price = p_match.group(1).strip()
+                continue
+            elif "Price:" in line or "💰" in line:
+                continue
+
+            if "Key Features:" in line or "Features:" in line or "🌟" in line:
+                f_match = re.search(r"Features:\*\*\s*(.+)$", line, re.IGNORECASE)
+                if f_match:
+                    raw_feats = f_match.group(1).split(",")
+                    for f in raw_feats:
+                        f_clean = f.strip()
+                        if f_clean:
+                            features.append(f_clean)
+                continue
+
+            spec_match = re.search(r"(?:([^\*:]+?)\s*)?\*\*([^\*:]+?):\*\*\s*(.+)$", line)
+            if spec_match:
+                icon_or_prefix = (spec_match.group(1) or "").strip()
+                label = spec_match.group(2).strip()
+                val = spec_match.group(3).strip()
+                full_label = f"{icon_or_prefix} {label}".strip() if icon_or_prefix else label
+                spec_items.append((full_label, val))
+            else:
+                spec_items.append(("", line))
+
+        card_html = ['\n<div class="car-card">']
+        card_html.append('  <div class="car-card-header">')
+        card_html.append('    <div class="car-title-group">')
+        card_html.append(f'      <h3 class="car-name">{name}</h3>')
+        if segment:
+            card_html.append(f'      <span class="car-segment-badge">{segment}</span>')
+        card_html.append('    </div>')
+        if price:
+            card_html.append(f'    <div class="car-price-badge">{price}</div>')
+        card_html.append('  </div>')
+
+        if spec_items:
+            card_html.append('  <div class="car-specs-grid">')
+            for lbl, val in spec_items:
+                card_html.append('    <div class="spec-card">')
+                if lbl:
+                    card_html.append(f'      <span class="spec-label">{lbl}</span>')
+                card_html.append(f'      <span class="spec-value">{val}</span>')
+                card_html.append('    </div>')
+            card_html.append('  </div>')
+
+        if features:
+            card_html.append('  <div class="car-features-section">')
+            card_html.append('    <span class="features-title">🌟 Key Features</span>')
+            card_html.append('    <div class="feature-pills">')
+            for f in features:
+                card_html.append(f'      <span class="feature-pill">{f}</span>')
+            card_html.append('    </div>')
+            card_html.append('  </div>')
+
+        if best_for:
+            card_html.append(f'  <div class="car-best-for">💡 <strong>Best For:</strong> {best_for}</div>')
+
+        card_html.append('</div>\n')
+        return "\n".join(card_html)
+
+    return pattern.sub(replace_with_card, text)
 
 
 # ─────────────────────────────────────────────
@@ -56,7 +157,7 @@ def on_login(username_or_email: str, password: str):
         choices = get_history_choices(user_dict)
         radio_update = gr.Radio(choices=choices, value=None, interactive=True)
         status_html = f"<div style='color:#065f46;font-weight:600;font-size:13px;padding:9px 14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;margin-top:10px;'>✅ {msg}</div>"
-        user_badge = f"<div class='user-pill'><span class='user-pill-dot is-online'>●</span> <strong>{user_dict['username']}</strong> <span class='user-pill-tier'>· Free Plan</span></div>"
+        user_badge = f"<div class='user-pill'><span class='user-pill-dot is-online'>●</span> <strong>{user_dict['username']}</strong></div>"
         return (
             user_dict,                                          # user_state
             status_html,                                        # auth_status
@@ -73,7 +174,7 @@ def on_login(username_or_email: str, password: str):
             gr.Column(visible=True),                            # auth_view (keep visible)
             gr.Column(visible=False),                           # main_view (keep hidden)
             gr.Radio(choices=[], value=None),                   # history_radio
-            "<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong> <span class='user-pill-tier'>· Free Plan</span></div>",
+            "<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong></div>",
         )
 
 
@@ -84,7 +185,7 @@ def on_signup(username: str, email: str, password: str):
         choices = get_history_choices(user_dict)
         radio_update = gr.Radio(choices=choices, value=None, interactive=True)
         status_html = f"<div style='color:#065f46;font-weight:600;font-size:13px;padding:9px 14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;margin-top:10px;'>✅ {msg}</div>"
-        user_badge = f"<div class='user-pill'><span class='user-pill-dot is-online'>●</span> <strong>{user_dict['username']}</strong> <span class='user-pill-tier'>· Free Plan</span></div>"
+        user_badge = f"<div class='user-pill'><span class='user-pill-dot is-online'>●</span> <strong>{user_dict['username']}</strong></div>"
         return (
             user_dict,
             status_html,
@@ -101,7 +202,7 @@ def on_signup(username: str, email: str, password: str):
             gr.Column(visible=True),
             gr.Column(visible=False),
             gr.Radio(choices=[], value=None),
-            "<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong> <span class='user-pill-tier'>· Free Plan</span></div>",
+            "<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong></div>",
         )
 
 
@@ -113,7 +214,7 @@ def on_guest():
         gr.Column(visible=False),                               # auth_view (hide)
         gr.Column(visible=True),                                # main_view (show)
         gr.Radio(choices=[], value=None, interactive=False),    # history_radio
-        "<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong> <span class='user-pill-tier'>· Free Plan</span></div>",
+        "<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong></div>",
     )
 
 
@@ -127,7 +228,7 @@ def on_logout():
         gr.Column(visible=True),                                # auth_view (show)
         gr.Column(visible=False),                               # main_view (hide)
         gr.Radio(choices=[], value=None, interactive=False),    # history_radio
-        "<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong> <span class='user-pill-tier'>· Free Plan</span></div>",
+        "<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong></div>",
         "", "", "", "", ""                                      # clear inputs
     )
 
@@ -140,8 +241,6 @@ def show_login_form():
         gr.Button(elem_classes=["auth-tab", "is-active"]),
         gr.Button(elem_classes=["auth-tab"]),
     )
-
-
 def show_signup_form():
     """Switch the authentication form without relying on Gradio Tabs internals."""
     return (
@@ -165,7 +264,11 @@ def on_select_history(session_id: str, user_state: Optional[dict]) -> Tuple[str,
         raw_msgs = db_get_conversation_messages(session_id, user_state["id"])
         formatted_history = []
         for m in raw_msgs:
-            formatted_history.append({"role": m["role"], "content": m["content"]})
+            content = m["content"]
+            if m["role"] == "assistant":
+                content = format_car_recommendation_cards(content)
+                content = content.replace("Gemini 2.5 Flash", "Gemini 3.6 Flash")
+            formatted_history.append({"role": m["role"], "content": content})
         return session_id, formatted_history, ""
     except Exception as e:
         return "", [], f"<div class='history-status-alert is-error'>Error loading chat: {e}</div>"
@@ -190,32 +293,22 @@ def on_delete_history(session_id: str, user_state: Optional[dict]) -> Tuple[None
 async def chat(
     user_message: str,
     history: list,
-    user_state: Optional[dict],
-    active_session_id: Optional[str]
+    user_state: Optional[dict] = None,
+    active_session_id: Optional[str] = None,
 ) -> AsyncIterator[Tuple[list, str, Optional[str], gr.Radio]]:
-    """
-    Stream natural-language Markdown into Gradio and persist only completed turns.
-    """
+    """Stream natural-language Markdown into Gradio and persist only completed turns."""
     if not user_message.strip():
         choices = get_history_choices(user_state)
-        yield history, "", active_session_id, gr.Radio(choices=choices)
+        yield history, "", active_session_id, gr.Radio(choices=choices, value=active_session_id)
         return
 
-    if not (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")):
-        bot_msg = "**API Key Missing!**\n\nPlease add your `GEMINI_API_KEY` to the `.env` file:\n```\nGEMINI_API_KEY=your_key_here\n```\nGet your key at: https://aistudio.google.com/app/apikey"
-        history.append({"role": "user", "content": user_message})
-        history.append({"role": "assistant", "content": bot_msg})
-        choices = get_history_choices(user_state)
-        yield history, "", active_session_id, gr.Radio(choices=choices)
-        return
+    session_id = active_session_id
+    if not session_id:
+        session_id = str(uuid.uuid4())
 
     try:
-        session_id = active_session_id
         if user_state and "id" in user_state:
-            if not session_id:
-                session_id = str(uuid.uuid4())
-            
-            title = user_message.strip()[:50] or "New Conversation"
+            title = user_message[:40] + ("..." if len(user_message) > 40 else "")
             db_create_conversation(user_state["id"], session_id, title)
             db_save_chat_message(user_state["id"], session_id, "user", user_message)
 
@@ -242,7 +335,13 @@ async def chat(
                 stream_history[-1] = {"role": "assistant", "content": output_markdown}
                 yield stream_history, "", session_id, radio
 
-        formatted = output_markdown + f"\n\n---\n`⚡ Gemini 2.5 Flash Automotive Agent` &nbsp;·&nbsp; `⏱️ {elapsed}s`"
+        # Convert car recommendations into modern card view
+        output_markdown = format_car_recommendation_cards(output_markdown)
+
+        # Dynamic model display badge
+        model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+        model_display = f"⚡ {model_name.replace('-', ' ').title()} Automotive Agent"
+        formatted = output_markdown + f"\n\n---\n`{model_display}` &nbsp;·&nbsp; `⏱️ {elapsed}s`"
         stream_history[-1] = {"role": "assistant", "content": formatted}
 
         if user_state and "id" in user_state and session_id:
@@ -671,29 +770,26 @@ html, body, #root, .gradio-container {
 .user-pill-dot.is-online {
     color: #10b981;
 }
-.user-pill-tier {
-    color: #64748b;
-}
-
 .btn-logout,
 button.btn-logout {
-    min-height: 32px !important;
-    max-height: 32px !important;
-    height: 32px !important;
-    padding: 0 12px !important;
-    font-size: 12px !important;
-    font-weight: 500 !important;
-    background: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    color: #64748b !important;
-    border-radius: 8px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
+    height: 36px !important;
+    padding: 0 16px !important;
+    font-size: 12.5px !important;
+    font-weight: 600 !important;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+    border: none !important;
+    color: #ffffff !important;
+    border-radius: 10px !important;
     cursor: pointer !important;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25) !important;
     transition: all 0.15s ease !important;
 }
 .btn-logout:hover {
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-    border-color: #cbd5e1 !important;
+    background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35) !important;
+    transform: translateY(-1px) !important;
 }
 
 /* App Workspace (Split View) */
@@ -1128,7 +1224,7 @@ button.prompt-chip {
     margin-bottom: 14px !important;
 }
 
-/* User Message: High Specificity Pure White Text on Dark Slate */
+/* User Message: CarDekho Warm Cream Pill Bubble with Dark Slate Text */
 .message.user,
 .message.user *,
 .message.user p,
@@ -1136,13 +1232,13 @@ button.prompt-chip {
 .message.user div,
 .message.user strong,
 .message.user em {
-    color: #ffffff !important;
+    color: #1e293b !important;
 }
 
 .message.user {
     display: block !important;
-    background: linear-gradient(135deg, #1e293b, #0f172a) !important;
-    border: 1px solid #334155 !important;
+    background: #fdf8f4 !important;
+    border: 1px solid #fed7aa !important;
     border-radius: 16px 16px 4px 16px !important;
     padding: 10px 18px !important;
     width: fit-content !important;
@@ -1151,9 +1247,10 @@ button.prompt-chip {
     margin-right: 0 !important;
     margin-bottom: 12px !important;
     font-size: 14.5px !important;
+    font-weight: 500 !important;
     line-height: 1.5 !important;
     box-sizing: border-box !important;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
     clear: both !important;
 }
 
@@ -1285,6 +1382,149 @@ button.prompt-chip {
     color: #334155 !important;
 }
 
+/* ─────────────────────────────────────────────
+   Car Recommendation Card View
+   ───────────────────────────────────────────── */
+.car-card {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    padding: 18px 22px !important;
+    margin: 16px 0 20px 0 !important;
+    box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+    overflow: hidden !important;
+}
+
+.car-card:hover {
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08) !important;
+    border-color: #cbd5e1 !important;
+}
+
+.car-card-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    padding-bottom: 12px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    margin-bottom: 14px !important;
+}
+
+.car-title-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
+}
+
+.car-name {
+    font-size: 17.5px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    letter-spacing: -0.2px !important;
+}
+
+.car-segment-badge {
+    background: #eff6ff !important;
+    color: #2563eb !important;
+    border: 1px solid #bfdbfe !important;
+    padding: 3px 10px !important;
+    border-radius: 9999px !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
+}
+
+.car-price-badge {
+    background: #f0fdf4 !important;
+    color: #166534 !important;
+    border: 1px solid #bbf7d0 !important;
+    padding: 4px 12px !important;
+    border-radius: 8px !important;
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.1px !important;
+}
+
+.car-specs-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+    gap: 10px !important;
+    margin: 12px 0 16px 0 !important;
+}
+
+.spec-card {
+    background: #f8fafc !important;
+    border: 1px solid #f1f5f9 !important;
+    border-radius: 10px !important;
+    padding: 10px 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+}
+
+.spec-label {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #64748b !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.3px !important;
+}
+
+.spec-value {
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+    color: #1e293b !important;
+    line-height: 1.35 !important;
+}
+
+.car-features-section {
+    margin: 12px 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 7px !important;
+}
+
+.features-title {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+}
+
+.feature-pills {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+}
+
+.feature-pill {
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    border: 1px solid #e2e8f0 !important;
+    padding: 3px 9px !important;
+    border-radius: 6px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+}
+
+.car-best-for {
+    background: #fefce8 !important;
+    border-left: 3px solid #f59e0b !important;
+    border-radius: 0 8px 8px 0 !important;
+    padding: 10px 14px !important;
+    margin-top: 12px !important;
+    color: #854d0e !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+}
+
 /* Docked Floating Input Bar (Sleek Elevated Capsule, No Collision) */
 .floating-input-bar {
     flex: 0 0 auto !important;
@@ -1391,10 +1631,11 @@ button.send-button {
 .disclaimer-text {
     flex-shrink: 0 !important;
     text-align: center;
-    font-size: 11px;
-    color: #94a3b8;
+    font-size: 11.5px;
+    color: #9ca3af;
     margin: 6px 0 0 0;
-    line-height: 1.2;
+    line-height: 1.3;
+    font-style: italic;
 }
 
 @media (max-width: 900px) {
@@ -1678,7 +1919,7 @@ def build_ui():
                 </div>
                 """)
                 with gr.Row(elem_classes="header-user-controls"):
-                    user_badge_md = gr.HTML("<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong> <span class='user-pill-tier'>· Free Plan</span></div>")
+                    user_badge_md = gr.HTML("<div class='user-pill'><span class='user-pill-dot'>●</span> <strong>Guest User</strong></div>")
                     logout_btn = gr.Button("Sign Out", size="sm", elem_classes="btn-logout")
 
             with gr.Row(elem_classes="app-workspace"):
@@ -1688,7 +1929,7 @@ def build_ui():
                     with gr.Column(elem_classes="sidebar-top-group"):
                         new_chat_btn = gr.Button("+ New Chat", size="sm", elem_classes="btn-new-chat")
                         
-                        gr.HTML("<div class='sidebar-title'>Recent Chats</div>")
+                        gr.HTML("<div class='sidebar-title'>🕒 Recent Chats</div>")
                         
                         history_radio = gr.Radio(
                             label="",
@@ -1737,7 +1978,7 @@ def build_ui():
 
                         with gr.Row(elem_classes="floating-input-bar"):
                             msg_input = gr.Textbox(
-                                placeholder="Ask anything about cars (e.g. Compare SUVs under ₹15L, diagnose engine sounds...)",
+                                placeholder="Ask Anything about Cars",
                                 show_label=False,
                                 lines=1,
                                 max_lines=4,
@@ -1746,7 +1987,7 @@ def build_ui():
                             )
                             send_btn = gr.Button("Send", variant="primary", elem_classes="send-button", scale=1)
 
-                        gr.HTML("<div class='disclaimer-text'>AutoBot provides AI assistance. Verify critical safety and on-road pricing with authorized dealerships.</div>")
+                        gr.HTML("<div class='disclaimer-text'><i>Responses may be inaccurate. Be sure to verify important details</i></div>")
 
         # ── Event Wire Up ───────────────────────────
         login_tab_btn.click(
