@@ -35,6 +35,36 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for warm-up and graceful shutdown."""
+    import asyncio
+    from db.connection import validate_db_config
+
+    logger.info("AutoBot API starting up...")
+    try:
+        validate_db_config()
+        logger.info("Database config validated — DATABASE_URL is set")
+    except Exception as exc:
+        logger.warning("Database config validation warning: %s", exc)
+
+    def _warm_agent():
+        try:
+            from agents.automotive_agent import get_automotive_agent
+            get_automotive_agent()
+            logger.info("Pydantic AI agent singleton ready")
+        except Exception as exc:
+            logger.warning("Agent warm-up skipped: %s", exc)
+
+    await asyncio.to_thread(_warm_agent)
+    logger.info("AutoBot API startup complete ✅")
+    yield
+    logger.info("AutoBot API shutdown complete")
+
+
 # ─────────────────────────────────────────────
 # Application factory
 # ─────────────────────────────────────────────
@@ -51,6 +81,7 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
+        lifespan=lifespan,
     )
 
     # ── Request timing middleware ──────────────────────────────────────────
@@ -105,26 +136,6 @@ def create_app() -> FastAPI:
             content={"detail": "Internal server error. Check API logs for details."},
         )
 
-    # ── Startup: warm up agent singleton ──────────────────────────────────
-
-    @app.on_event("startup")
-    async def on_startup() -> None:
-        import asyncio
-        from db.connection import validate_db_config
-
-        logger.info("AutoBot API starting up...")
-
-        validate_db_config()
-        logger.info("Database config validated — DATABASE_URL is set")
-
-        def _warm_agent():
-            from agents.automotive_agent import get_automotive_agent
-            get_automotive_agent()
-            logger.info("Pydantic AI agent singleton ready")
-
-        await asyncio.to_thread(_warm_agent)
-        logger.info("AutoBot API startup complete ✅")
-
     # ── Routers ───────────────────────────────────────────────────────────
 
     app.include_router(health.router)
@@ -142,17 +153,23 @@ def create_app() -> FastAPI:
     )
     async def root() -> JSONResponse:
         from api.dependencies import check_db_connection
-        from agents.automotive_agent import _cached_agent
 
         db_status = await check_db_connection()
-        agent_status = "ready" if _cached_agent is not None else "not_initialised"
+        try:
+            from agents.automotive_agent import get_automotive_agent
+            get_automotive_agent()
+            agent_status = "ready"
+            agent_ok = True
+        except Exception as exc:
+            agent_status = f"unconfigured: {exc}"
+            agent_ok = False
+
         db_ok = db_status == "connected"
-        agent_ok = agent_status == "ready"
 
         logger.info(
             "Status check — DB: %s | Agent: %s",
             "✅ connected" if db_ok else f"❌ {db_status}",
-            "✅ ready" if agent_ok else "❌ not_initialised",
+            "✅ ready" if agent_ok else f"❌ {agent_status}",
         )
 
         overall = "ok" if (db_ok and agent_ok) else "degraded"

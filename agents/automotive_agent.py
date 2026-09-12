@@ -693,11 +693,11 @@ async def stream_chat_with_autobot(
         err_str = str(exc).lower()
         if "429" in str(exc) or "quota" in err_str or "resource_exhausted" in err_str:
             quota_msg = (
-                "⚠️ **Gemini API Rate Limit / Daily Quota Reached**\n\n"
-                "The free-tier Gemini API request limit (`20 requests/day` for gemini-3.6-flash) has been temporarily exhausted.\n\n"
+                "⚠️ **Gemini API Rate Limit / Quota Reached**\n\n"
+                "The Gemini API request limit or daily quota has been temporarily reached.\n\n"
                 "**How to fix:**\n"
                 "1. Please wait **20 to 60 seconds** and try your request again.\n"
-                "2. Or add a fresh `GEMINI_API_KEY` in your `.env` file.\n"
+                "2. Or verify / refresh your `GEMINI_API_KEY` in the `.env` file.\n"
             )
             yield AutoBotStreamUpdate(
                 content=quota_msg,

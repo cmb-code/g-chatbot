@@ -132,6 +132,7 @@ async def chat_stream(body: ChatRequest) -> StreamingResponse:
 
         final_content = ""
         final_intent = "unclassified"
+        update: Optional[AutoBotStreamUpdate] = None
 
         try:
             async for update in stream_chat_with_autobot(

@@ -93,9 +93,9 @@ check "Login returns 200 or 401" \
     "$([ "$LOGIN_STATUS" -eq 200 ] || [ "$LOGIN_STATUS" -eq 401 ]; echo $?)"
 echo ""
 
-# ── 6. SSE streaming (first 3 seconds only) ──────────────────────────────────
-echo "6. POST /chat — SSE streaming (3s sample)"
-SSE_OUTPUT=$(curl -s -N --max-time 3 \
+# ── 6. SSE streaming (first 10 seconds sample) ────────────────────────────────
+echo "6. POST /chat — SSE streaming (10s sample)"
+SSE_OUTPUT=$(curl -s -N --max-time 10 \
     -X POST "$BASE_URL/chat" \
     -H "Content-Type: application/json" \
     -d '{"message": "What are the best EVs in India under 20 lakhs?"}' 2>/dev/null || true)

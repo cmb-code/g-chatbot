@@ -29,7 +29,12 @@ router = APIRouter(tags=["Health"])
 )
 async def health_check() -> JSONResponse:
     db_status = await check_db_connection()
-    agent_status = "ready" if _cached_agent is not None else "not_initialised"
+    try:
+        from agents.automotive_agent import get_automotive_agent
+        get_automotive_agent()
+        agent_status = "ready"
+    except Exception as exc:
+        agent_status = f"unconfigured: {exc}"
     overall_ok = db_status == "connected"
     status_code = 200 if overall_ok else 503
 

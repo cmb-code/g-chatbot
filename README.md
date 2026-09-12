@@ -1,55 +1,63 @@
 # AutoBot — AI Automobile Assistant 🚗⚡
 
-AutoBot is an intelligent, full-stack automobile assistant tailored for the **Indian car market**. Built using **Pydantic AI**, **Google Gemini 3.6 Flash**, **Gradio**, and **PostgreSQL**, AutoBot seamlessly handles car recommendations, diagnostics triage, service schedules, and financial EMI calculations in a single conversation.
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Pydantic AI](https://img.shields.io/badge/Agent-Pydantic%20AI-e92063.svg)](https://ai.pydantic.dev/)
+[![Model](https://img.shields.io/badge/LLM-Gemini%203.6%20Flash-4285F4.svg)](https://aistudio.google.com/)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
+[![Gradio UI](https://img.shields.io/badge/UI-Gradio-ff7c00.svg)](https://www.gradio.app/)
+[![Database](https://img.shields.io/badge/Database-PostgreSQL%2016-336791.svg)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+**AutoBot** is an enterprise-grade, full-stack automotive AI assistant engineered specifically for the **Indian automobile market**. Powered by **Pydantic AI**, **Google Gemini 3.6 Flash**, **FastAPI**, **Gradio**, and **PostgreSQL**, AutoBot seamlessly delivers vehicle recommendations, safety-first diagnostic triage, maintenance schedules, and deterministic loan EMI calculations within a single unified conversation.
 
 ---
 
-## 🌟 Key Features
+## 🌟 Key Capabilities
 
-- **🧠 LLM-Led Multi-Intent Classification**: Dynamically classifies complex user requests into single or multiple intents (`buying`, `diagnostics`, `service`, `finance`, `general`) without rigid keyword routers.
-- **🛡️ Safe Read-Only Tool Boundary**: The LLM uses parameterised Python tools to query PostgreSQL and perform math. The model never executes raw SQL or accesses DB credentials.
-- **⚡ Real-Time Word-by-Word Streaming**: Uses Pydantic AI's event-driven streaming (`run_stream_events`) to stream response tokens directly to the Gradio web interface as they generate.
-- **📊 Fact-Grounded Evidence**: Grounded in real catalogue data for Indian vehicles, verified common-issue records, standard service intervals, and deterministic EMI math.
-- **🚨 Diagnostic Triage & Safety Policy**: Identifies critical vehicle hazards (brake/steering loss, overheating, smoke/fire) and prioritizes safety advice ("do not drive") over repair steps.
-- **🗄️ PostgreSQL Persistence & History**: Multi-user account registration (PBKDF2-hashed passwords) with saved chat sessions and searchable conversation history.
-- **⚡ Fast In-Memory TTL Cache**: 5-minute thread-safe in-memory cache (`TTLCache`) for read-heavy catalogue queries (~0ms cache hits).
-- **🔍 RapidFuzz Fuzzy Fallback Engine**: Uses token-set ratio fuzzy matching to match natural-language symptom descriptions (e.g., *"car shaking at high speed"*) to database records.
+- **🧠 LLM-Led Intent Classification**: Dynamically routes user requests into single or combined intents (`buying`, `diagnostics`, `service`, `finance`, `general`) without brittle regex or keyword routers.
+- **🏷️ Modern Car Recommendation Card View**: Formats vehicle recommendations into interactive HTML cards featuring category badges, ex-showroom price pills, responsive 4-column specifications grids, feature tags, and buyer suitability callouts.
+- **⚡ Prefix KV-Caching**: Sized to ~4,500 prompt tokens (surpassing Gemini's 4,096-token KV-cache threshold). Delivers ~90% cost reduction and ultra-low Time-To-First-Token (TTFT) on multi-turn dialogues.
+- **🛡️ Safe Tool Boundary**: The LLM calls parameterised Python tools for database lookups and EMI arithmetic. Never executes raw SQL or accesses database credentials directly.
+- **⚡ Real-Time Token Streaming**: Event-driven token emission via `run_stream_events` feeds both the Gradio UI and FastAPI Server-Sent Events (SSE) stream simultaneously.
+- **🚨 Diagnostic Safety Policy**: Enforces strict automotive safety guidelines. Flags severe drivability hazards (brake failure, steering loss, overheating, smoke) with immediate "do not drive" warnings.
+- **🗄️ PostgreSQL Persistence & History**: Multi-user authentication (salted PBKDF2-HMAC-SHA256 password hashing), session persistence, and instant conversation reload.
+- **⚡ 5-Minute In-Memory TTL Cache**: Thread-safe in-memory caching (`TTLCache`) eliminates redundant database queries for frequent vehicle catalogue searches (~0ms latency).
+- **🔍 RapidFuzz Fuzzy Fallback Engine**: Uses token-set ratio matching to normalize slang, typos, and natural-language symptoms (e.g. *"car shaking at high speed"*) against catalogued records.
+- **🌐 Dual Server Support**: Run the complete Gradio Web UI (`:7860`), standalone FastAPI server (`:8000`), or both via Docker Compose.
 
 ---
 
 ## 🏗️ Architecture & Workflow
 
 ```text
- ┌─────────────────────────────┐       ┌──────────────────────────────────┐
- │    Gradio Web UI (:7860)    │       │    FastAPI REST/SSE API (:8000)   │
- │    (existing, unchanged)    │       │    POST /chat  POST /chat/sync    │
- │                             │       │    POST /auth/signup  /auth/login │
- │                             │       │    GET /sessions/{id}/history     │
- │                             │       │    GET /health                    │
- └──────────────┬──────────────┘       └─────────────────┬────────────────┘
-                │  stream_chat_with_autobot()              │  stream/chat_with_autobot()
-                └──────────────────┬───────────────────────┘
-                                   ▼
-                      ┌────────────────────────┐
-                      │   Pydantic AI Agent    │
-                      │   (Gemini 3.6 Flash)   │
-                      └────────────┬───────────┘
-                                   │ LLM-selected tools
-                                   ▼
- ┌─────────────────────────────────────────────────────────────────────────┐
- │ Safe Tool Boundary (Parameterised SQL & Pure Math)                      │
- │  • record_intent_classification   • search_catalog_by_segment           │
- │  • search_catalog                 • search_catalog_by_fuel              │
- │  • search_catalog_by_budget       • search_known_issue                  │
- │  • get_vehicle                    • calculate_loan_emi                  │
- │  • get_standard_service_intervals                                       │
- └────────────────────────────────┬────────────────────────────────────────┘
-                                  │
-                                  ▼
-                     ┌────────────────────────┐
-                     │  PostgreSQL + TTLCache │
-                     │  (5-Min Per-Key Expiry)│
-                     └────────────────────────┘
+┌──────────────────────────────────────┐       ┌──────────────────────────────────────┐
+│        Gradio Web UI (:7860)         │       │     FastAPI REST/SSE API (:8000)     │
+│   • Modern Glassmorphic SPA Layout   │       │   • POST /chat (SSE Token Stream)    │
+│   • Interactive Car Cards & History  │       │   • POST /chat/sync (Full JSON)      │
+│   • Built-in Auth & Session Manager  │       │   • POST /auth/* & GET /sessions/*   │
+└──────────────────┬───────────────────┘       └──────────────────┬───────────────────┘
+                   │                                              │
+                   └──────────────────────┬───────────────────────┘
+                                          ▼
+                             ┌────────────────────────┐
+                             │   Pydantic AI Agent    │
+                             │   (Gemini 3.6 Flash)   │
+                             │  KV Prefix Cached (>4k)│
+                             └────────────┬───────────┘
+                                          │ LLM-Selected Tools
+                                          ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ Safe Tool Execution Boundary (Parameterised SQL & Deterministic Math)                  │
+│  • record_intent_classification     • search_catalog_by_segment   • get_vehicle        │
+│  • search_catalog                   • search_catalog_by_fuel      • search_known_issue │
+│  • search_catalog_by_budget         • calculate_loan_emi          • get_service_ivs    │
+└─────────────────────────────────────────┬──────────────────────────────────────────────┘
+                                          ▼
+                             ┌────────────────────────┐
+                             │  PostgreSQL + TTLCache │
+                             │   (Pool: min 2, max 10)│
+                             └────────────────────────┘
 ```
 
 ---
@@ -58,75 +66,58 @@ AutoBot is an intelligent, full-stack automobile assistant tailored for the **In
 
 ```text
 Auto-Bot/
-├── main.py                     # Primary Application Entrypoint (UI on :7860 + SPA redirect)
-├── api_server.py               # Standalone FastAPI REST & SSE Server (optional on :8000)
-├── run_all.py                  # Dev convenience — starts both servers from one command
-├── Dockerfile                  # Production Docker container definition
-├── docker-compose.yml          # Full-stack Docker Compose (PostgreSQL + AutoBot App)
-├── .dockerignore               # Docker build exclusions
+├── main.py                     # Primary Application (Gradio UI on :7860)
+├── api_server.py               # Standalone FastAPI Server (REST & SSE on :8000)
+├── run_all.py                  # Multi-service launcher (runs UI + API concurrently)
+├── Dockerfile                  # Multi-stage production Python container
+├── docker-compose.yml          # Full-stack orchestrator (PostgreSQL 16 + AutoBot App)
 ├── requirements.txt            # Production Python dependencies
-├── .env.example                # Environment variable template
-├── .gitignore                  # Git ignore definitions
+├── .env.example                # Environment variable configuration template
 │
-├── api/                        # ── FastAPI Layer ────────────────────────────────────
-│   ├── app.py                  # FastAPI app factory, CORS, startup warm-up, routers
-│   ├── schemas.py              # Pydantic request/response models
-│   ├── dependencies.py         # asyncio.to_thread wrappers for sync DB calls
-│   ├── logger.py               # Centralized logging configuration
+├── api/                        # ── FastAPI REST & SSE Layer ─────────────────────────
+│   ├── app.py                  # App factory, lifespan context manager, CORS, middleware
+│   ├── schemas.py              # Pydantic v2 request and response models
+│   ├── dependencies.py         # Async thread-pool wrappers for synchronous DB queries
+│   ├── logger.py               # Centralized structured logging configuration
 │   └── routers/
-│       ├── health.py           # GET /health
-│       ├── chat.py             # POST /chat (SSE) + POST /chat/sync
-│       ├── auth.py             # POST /auth/signup + POST /auth/login
+│       ├── health.py           # GET /health (Liveness & readiness probe)
+│       ├── chat.py             # POST /chat (SSE Stream) & POST /chat/sync
+│       ├── auth.py             # POST /auth/signup & POST /auth/login
 │       └── sessions.py         # GET /sessions/{session_id}/history
 │
 ├── agents/
-│   └── automotive_agent.py     # Pydantic AI Agent, system prompt, safe tools
+│   └── automotive_agent.py     # Pydantic AI Agent, cached prompt, tool registrations
 │
 ├── tools/
-│   └── car_tools.py            # DB query helpers & EMI math
+│   └── car_tools.py            # Catalogue retrieval helpers & EMI loan calculations
 │
 ├── db/
-│   ├── connection.py           # ThreadedConnectionPool & TTLCache
-│   ├── queries.py              # Parameterised SQL queries
-│   ├── fuzzy_queries.py        # RapidFuzz fuzzy search engine
-│   ├── auth.py                 # PBKDF2 password hashing & user auth
-│   └── migrate.py              # DDL schema migration & seed data loader
+│   ├── connection.py           # ThreadedConnectionPool + in-memory TTLCache
+│   ├── queries.py              # Parameterised SQL queries & conversation persistence
+│   ├── fuzzy_queries.py        # RapidFuzz search engine, alias maps, and synonym logic
+│   ├── auth.py                 # PBKDF2 password hashing & authentication
+│   └── migrate.py              # DDL migrations & seed catalog importer
 │
 ├── models/
-│   └── schemas.py              # Pydantic domain models (FuzzyCarFilter, QueryPlan)
+│   └── schemas.py              # QueryPlan and FuzzyCarFilter domain models
 │
 ├── ui/
-│   └── app.py                  # Gradio SPA UI & Design System CSS
+│   └── app.py                  # Gradio UI components, Car Card formatter, and CSS
 │
 ├── data/
-│   └── seed.json               # Seed data for PostgreSQL
+│   └── seed.json               # Curated Indian automotive seed database
 │
-└── scripts/
-    ├── docker-entrypoint.sh    # Container entrypoint (auto-migration & app runner)
-    └── smoke_test.sh           # API smoke test suite
+├── scripts/
+│   ├── docker-entrypoint.sh    # Docker entrypoint (auto-migration & service execution)
+│   └── smoke_test.sh           # End-to-end API & UI smoke test suite
+│
+└── tests/                      # ── Automated Test Suite (pytest) ───────────────────
+    ├── conftest.py             # Test environment path & dependency configuration
+    ├── test_api.py             # FastAPI endpoint integration tests
+    ├── test_cards.py           # Car Recommendation Card View formatting tests
+    ├── test_emi.py             # Loan EMI mathematical precision tests
+    └── test_fuzzy.py           # RapidFuzz synonym & diagnostic matching tests
 ```
-
----
-
-## 🏷️ Intent Categories & Tools
-
-AutoBot classifies every request into one or more of the following **5 Intent Categories**:
-
-| Intent | Description | Example Query |
-|---|---|---|
-| 🛒 **`buying`** | Recommendations, comparisons, budget & features | *"Suggest petrol SUVs under 15 Lakhs"* |
-| 🔧 **`diagnostics`** | Fault symptoms, warning lights, drivability & safety | *"My car vibrates at high speeds, what's wrong?"* |
-| 🔩 **`service`** | Maintenance schedules, parts replacement & costs | *"When should I change engine oil and brake pads?"* |
-| 💰 **`finance`** | EMI calculations, loan tenure, down payment | *"Calculate EMI for a 10L loan for 5 years at 9%"* |
-| 💬 **`general`** | EV policies, rules, insurance, and accessories | *"What are the government rules on EV subsidies?"* |
-
-### Available Safe Tools:
-- **`record_intent_classification`**: Records detected intent labels.
-- **`search_catalog` / `search_catalog_by_budget` / `search_catalog_by_fuel` / `search_catalog_by_segment`**: Queries vehicle inventory based on specifications.
-- **`get_vehicle`**: Direct partial name match lookup for specific models (e.g. *"Altroz"*).
-- **`search_known_issue`**: Performs exact SQL match followed by RapidFuzz token matching for diagnostic symptoms.
-- **`get_standard_service_intervals`**: Fetches standard service intervals and estimated replacement costs.
-- **`calculate_loan_emi`**: Pure mathematical execution of monthly loan EMI, interest, and total payable amount.
 
 ---
 
@@ -134,213 +125,207 @@ AutoBot classifies every request into one or more of the following **5 Intent Ca
 
 ### 1. Prerequisites
 - **Python 3.10+**
-- **Docker Desktop** (for running PostgreSQL locally) — [Download here](https://www.docker.com/products/docker-desktop/)
+- **Docker Desktop** — [Download Docker](https://www.docker.com/products/docker-desktop/)
 - **Google Gemini API Key** — [Get a free key from Google AI Studio](https://aistudio.google.com/app/apikey)
 
-### 2. Installation
+---
 
-Clone the repository and install dependencies:
+### 2. Option A: Full Stack with Docker Compose (Recommended)
+
+Run everything (PostgreSQL, Gradio UI, and FastAPI API) with a single command:
 
 ```bash
+# 1. Clone the repository
 git clone https://github.com/your-username/Auto-Bot.git
 cd Auto-Bot
 
-# Create and activate virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
+# 2. Configure environment variables
+cp .env.example .env
+# Open .env and add your GEMINI_API_KEY
+```
 
-# Install required packages
+```bash
+# 3. Build and launch all services in background
+docker compose up -d --build
+```
+
+That's it! AutoBot will:
+1. Start PostgreSQL 16 on port `5433` with healthchecks.
+2. Automatically run database migrations and seed catalogue data.
+3. Start the **Gradio Web UI** on **`http://localhost:7860`**.
+4. Start the **FastAPI REST/SSE Server** on **`http://localhost:8000`** (Swagger docs at **`http://localhost:8000/docs`**).
+
+#### Daily Docker Management:
+```bash
+docker compose logs -f app      # Stream live application logs
+docker compose ps               # Check container health status
+docker compose down             # Stop services (database data is preserved)
+docker compose down -v          # Stop AND wipe database volume (fresh start)
+```
+
+---
+
+### 3. Option B: Local Python Environment
+
+#### 1. Setup Virtual Environment:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate    # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. Database — PostgreSQL via Docker Compose (Recommended)
-
-AutoBot ships with a `docker-compose.yml` that spins up a dedicated PostgreSQL 16 container with a
-persistent named volume. This is the recommended approach for local development — no cloud account or
-system-wide Postgres installation needed.
-
-#### Start PostgreSQL
-
+#### 2. Start PostgreSQL:
+You can start just the database using Docker:
 ```bash
-docker compose up -d
+docker compose up -d db
 ```
 
-Docker will pull `postgres:16` (first run only, ~200 MB), create the database, user, and volume, and
-start the container in the background.
-
-#### Verify the container is healthy
-
-```bash
-docker compose ps
-```
-
-Expected output:
-```
-NAME               IMAGE         STATUS              PORTS
-autobot-postgres   postgres:16   Up (healthy)        0.0.0.0:5433->5432/tcp
-```
-
-#### View live PostgreSQL logs
-
-```bash
-docker compose logs -f db
-```
-
-#### Daily workflow
-
-```bash
-docker compose up -d      # Morning — start Postgres
-docker compose down       # Evening — stop Postgres (data is preserved)
-docker compose down -v    # Fresh wipe — stops AND deletes all data
-```
-
-#### Inspect database values from terminal
-
-```bash
-# Open an interactive psql shell inside the container
-docker exec -it autobot-postgres psql -U autobot -d autobot_db
-
-# Inside psql:
-\dt                                          -- list all tables
-SELECT name, brand, segment FROM cars;       -- browse car catalog
-SELECT id, username, email FROM users;       -- browse registered users
-SELECT session_id, title FROM conversations; -- browse saved chats
-\q                                           -- exit
-```
-
-```bash
-# Or check row counts in one command (no psql shell needed)
-docker exec autobot-postgres psql -U autobot -d autobot_db \
-  -c "SELECT tablename, n_live_tup AS rows FROM pg_stat_user_tables ORDER BY rows DESC;"
-```
-
-> **Note on port**: The container maps Docker's internal port `5432` to your local port **`5433`**.
-> This avoids conflicts if you also have a system-level PostgreSQL running on `5432`.
-
----
-
-### 4. Environment Configuration
-
-Copy the template and fill in your values:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-
-```env
-# Gemini API Key (Required)
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# PostgreSQL — Docker Compose (port 5433 avoids clash with local Postgres on 5432)
-DATABASE_URL=postgresql://autobot:autobot123@localhost:5433/autobot_db
-
-# Optional overrides
-GEMINI_MODEL=gemini-3.6-flash
-LOG_LEVEL=INFO
-```
-
-> **Cloud alternative**: If you prefer Supabase, Neon, or Render instead of Docker,
-> set `DATABASE_URL` to your cloud connection string and skip the `docker compose` step.
-
----
-
-### 5. Database Setup & Migration
-
-Run the migration script to create all 6 tables and seed the Indian car catalog:
-
+#### 3. Run Database Migrations:
 ```bash
 python db/migrate.py
 ```
 
-Expected output:
-```
-✅  Migration complete!
-   • cars:              8 rows
-   • common_issues:     5 rows
-   • service_intervals: 10 rows
-```
-
-### 6. Launch the Application
-
-#### Option A — Gradio UI only
-
-```bash
-python main.py
-```
-
-Open your browser at `http://localhost:7860`.
-
-#### Option B — FastAPI REST/SSE API only
-
-```bash
-python api_server.py
-```
-
-API available at `http://localhost:8000` · Interactive docs at `http://localhost:8000/docs`.
-
-#### Option C — Both servers together (recommended for development)
-
-```bash
-python run_all.py
-```
-
-Starts Gradio on `:7860` and FastAPI on `:8000` as separate processes. Press `Ctrl+C` to stop both.
+#### 4. Launch Services:
+- **Run both UI and API together**:
+  ```bash
+  python run_all.py
+  ```
+- **Run Gradio UI only** (`http://localhost:7860`):
+  ```bash
+  python main.py
+  ```
+- **Run FastAPI server only** (`http://localhost:8000`):
+  ```bash
+  python api_server.py
+  ```
 
 ---
 
-### 6. FastAPI Quick Reference
+## 🎨 Car Recommendation Card View
 
-| Method | Endpoint | Description |
-|:--|:--|:--|
-| `GET` | `/health` | Liveness check — DB + agent status |
-| `POST` | `/chat` | SSE streaming chat |
-| `POST` | `/chat/sync` | Non-streaming chat, returns full JSON |
-| `POST` | `/auth/signup` | Register a new user |
-| `POST` | `/auth/login` | Authenticate, returns user record |
-| `GET` | `/sessions/{id}/history` | Load past conversation messages |
+AutoBot presents recommended vehicles using structured, interactive automotive cards:
 
-**Example — sync chat:**
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│ 🚗 Tata Nexon EV   [ Compact SUV EV ]               [ 💰 ₹14.49L - ₹19.49L ] │
+├────────────────────────────────────────────────────────────────────────┤
+│  ⛽ FUEL & ENGINE              📊 RANGE / MILEAGE                       │
+│  Electric (EV) · 40.5 kWh       465 km per charge                      │
+│                                                                        │
+│  ⚙️ TRANSMISSION                🛡️ SAFETY RATING                        │
+│  Automatic                      5-Star BNCAP, 6 Airbags                │
+├────────────────────────────────────────────────────────────────────────┤
+│  🌟 KEY FEATURES                                                       │
+│  [ Connected Car Tech ]  [ Level 2 ADAS ]  [ Sunroof ]  [ V2L Charger ] │
+├────────────────────────────────────────────────────────────────────────┤
+│  💡 Best For: Daily urban commuting and eco-conscious family roadtrips │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+The card engine converts vehicle markdown blocks automatically into styled `.car-card` DOM structures, ensuring consistent visual appeal across the Gradio UI and REST API clients.
+
+---
+
+## 📡 FastAPI REST & SSE API Reference
+
+| Method | Path | Summary | Description |
+|:---|:---|:---|:---|
+| `GET` | `/` | Root Status | Overall service health, database check, agent readiness probe |
+| `GET` | `/health` | Health Check | Kubernetes / Docker liveness and readiness probe |
+| `POST` | `/chat` | SSE Chat Stream | Real-time Server-Sent Events stream emitting tokens and metadata |
+| `POST` | `/chat/sync` | Synchronous Chat | Synchronous query returning complete markdown, intent, and timing |
+| `POST` | `/auth/signup` | Register User | Creates user account with PBKDF2-hashed password |
+| `POST` | `/auth/login` | Login User | Authenticates user credentials and returns session user record |
+| `GET` | `/sessions/{id}/history` | Chat History | Fetches ordered conversation turn history for an authenticated user |
+
+### cURL Examples
+
+#### 1. Synchronous Query
 ```bash
 curl -X POST http://localhost:8000/chat/sync \
   -H "Content-Type: application/json" \
-  -d '{"message": "Show me petrol SUVs under 15 lakhs"}'
+  -d '{
+    "message": "Recommend top petrol SUVs under 15 Lakhs in India with price and mileage"
+  }'
 ```
 
-**Example — SSE streaming:**
+#### 2. Server-Sent Events (SSE) Streaming
 ```bash
 curl -N -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "Calculate EMI for 10L at 9% for 5 years"}'
+  -d '{
+    "message": "Calculate EMI for an 8 Lakh car loan at 9.5% for 5 years with 1.5 Lakh down payment"
+  }'
+```
+
+#### 3. User Authentication & History
+```bash
+# Register
+curl -X POST http://localhost:8000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"username":"goutham","email":"goutham@autobot.dev","password":"SecretPassword123"}'
+
+# Login
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username_or_email":"goutham","password":"SecretPassword123"}'
 ```
 
 ---
 
-## 🔄 End-to-End Request Lifecycle
+## 🧪 Testing Suite
 
-1. **User Interaction**: User enters a prompt in the Gradio chat canvas (e.g., *"Show me petrol SUVs under 15L and calculate EMI for 10L loan for 5 years"*).
-2. **Session Persistence**: If logged in, the user message is saved to PostgreSQL in the `chat_messages` table under the active `session_id`.
-3. **Intent Classification**: Gemini executes `record_intent_classification(intents=["buying", "finance"])` as its mandatory first tool call.
-4. **Tool Execution**: Gemini selects relevant evidence tools (`search_catalog_by_fuel`, `search_catalog_by_budget`, `search_catalog_by_segment`, `calculate_loan_emi`).
-5. **Caching & DB Lookup**: Tool calls check `TTLCache` (~0ms hit). On miss, a connection is borrowed from `ThreadedConnectionPool` to query PostgreSQL.
-6. **Streaming Generation**: As Gemini writes its final natural-language Markdown output, `Pydantic AI` emits `PartDeltaEvent` tokens which stream to the UI in real time.
-7. **Completion & Logging**: The complete answer, elapsed time, and intent labels are persisted to PostgreSQL and rendered with an execution badge (`⚡ Gemini 3.6 Flash · ⏱️ 1.4s`).
+AutoBot includes a complete automated test suite powered by `pytest`.
+
+Run all automated unit and integration tests:
+```bash
+python3 -m pytest -v
+```
+
+### Test Coverage Breakdown:
+- **`tests/test_api.py`**: Validates `/health`, `/`, user signup/login lifecycle, and 404 session handling.
+- **`tests/test_cards.py`**: Tests vehicle recommendation markdown conversion to modern HTML car cards.
+- **`tests/test_emi.py`**: Tests mathematical precision of car loan EMI, zero-interest edge cases, and currency formatting.
+- **`tests/test_fuzzy.py`**: Tests RapidFuzz alias mapping for fuel types, car segments, brands, and symptom search.
+
+### Automated Smoke Tests:
+Run the live shell test script against running instances:
+```bash
+chmod +x scripts/smoke_test.sh
+./scripts/smoke_test.sh
+```
 
 ---
 
-## 🛠️ Technology Stack
+## ⚙️ Environment Variables
 
-- **Language**: Python 3.10+
-- **AI Framework**: [Pydantic AI](https://ai.pydantic.dev/)
-- **LLM Engine**: Google Gemini 3.6 Flash (`google-genai`)
-- **Web UI**: [Gradio](https://www.gradio.app/)
-- **Database**: PostgreSQL (`psycopg2-binary`)
-- **Fuzzy Search**: [RapidFuzz](https://github.com/rapidfuzz/RapidFuzz)
-- **Environment**: `python-dotenv`
+All settings are configured via `.env` or system environment variables:
+
+| Variable | Required | Default | Description |
+|:---|:---:|:---:|:---|
+| `GEMINI_API_KEY` | **Yes** | — | Google AI Studio Gemini API Key |
+| `DATABASE_URL` | **Yes** | — | PostgreSQL connection URI (`postgresql://user:pass@host:port/db`) |
+| `GEMINI_MODEL` | No | `gemini-3.6-flash` | Gemini model variant |
+| `API_PORT` | No | `8000` | Port for FastAPI REST/SSE server |
+| `API_HOST` | No | `0.0.0.0` | Host binding for FastAPI server |
+| `CORS_ORIGINS` | No | `*` | Allowed CORS origins (comma-separated for production) |
+| `LOG_LEVEL` | No | `INFO` | Application log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 
 ---
 
-## 📝 License
+## 🗃️ Database Schema
 
-This project is open-source and available under the [MIT License](LICENSE).
+The database consists of 6 core tables configured with foreign keys and indexes:
+
+1. **`cars`**: Vehicle inventory catalog (name, brand, segment, price ranges, fuel types, mileage JSONB, features).
+2. **`common_issues`**: Diagnostic records (symptoms, probable causes, severity rating, repair cost ranges).
+3. **`service_intervals`**: Preventive maintenance checklist (item key, recommended km interval, estimated cost).
+4. **`users`**: User account credentials (username, email, salted PBKDF2 password hashes).
+5. **`conversations`**: Chat session headers linked to user IDs (`session_id` UUID, title, timestamp).
+6. **`chat_messages`**: Chat turn history (`session_id`, `role`, `content`, detected `intent`, `created_at`).
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).

@@ -38,6 +38,7 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    command: ["python", "run_all.py"]
     depends_on:
       db:
         condition: service_healthy
